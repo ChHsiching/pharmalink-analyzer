@@ -26,9 +26,9 @@ def extract_top_pairs(
     matrix: np.ndarray,
     feature_names: list[str],
     top_k: int = 10,
-    threshold: float | None = None,
+    threshold_percentile: int | None = None,
 ) -> tuple[list[dict], float]:
-    """Extract top-K component pairs sorted by attention weight."""
+    """Extract top-K component pairs classified by percentile threshold."""
     n = len(feature_names)
     pairs = []
     for i in range(n):
@@ -42,12 +42,15 @@ def extract_top_pairs(
 
     pairs.sort(key=lambda p: p["weight"], reverse=True)
 
-    if threshold is None:
-        threshold = float(np.median([p["weight"] for p in pairs]))
+    if threshold_percentile is None:
+        threshold_percentile = 50
+
+    all_weights = [p["weight"] for p in pairs]
+    abs_threshold = float(np.percentile(all_weights, threshold_percentile))
 
     for p in pairs[:top_k]:
         p["classification"] = (
-            "synergistic" if p["weight"] > threshold else "antagonistic"
+            "synergistic" if p["weight"] >= abs_threshold else "antagonistic"
         )
 
-    return pairs[:top_k], threshold
+    return pairs[:top_k], float(threshold_percentile)

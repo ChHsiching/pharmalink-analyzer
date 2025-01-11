@@ -46,10 +46,35 @@ def test_extract_top_pairs_sorted_descending(trained_checkpoint):
     assert weights == sorted(weights, reverse=True)
 
 
-def test_extract_top_pairs_classification(trained_checkpoint):
+def test_extract_top_pairs_default_percentile_is_50(trained_checkpoint):
     cp_dir, X, feature_names, config = trained_checkpoint
     matrix = extract_attention_weights(cp_dir, X, config)
-    pairs, threshold = extract_top_pairs(matrix, feature_names, top_k=5)
-    for pair in pairs:
-        expected = "synergistic" if pair["weight"] > threshold else "antagonistic"
-        assert pair["classification"] == expected
+    _, returned_pct = extract_top_pairs(matrix, feature_names, top_k=3)
+    assert returned_pct == 50.0
+
+
+def test_extract_top_pairs_percentile_0_all_synergistic(trained_checkpoint):
+    cp_dir, X, feature_names, config = trained_checkpoint
+    matrix = extract_attention_weights(cp_dir, X, config)
+    pairs, pct = extract_top_pairs(matrix, feature_names, top_k=3, threshold_percentile=0)
+    assert pct == 0.0
+    assert all(p["classification"] == "synergistic" for p in pairs)
+
+
+def test_extract_top_pairs_percentile_100_mostly_antagonistic(trained_checkpoint):
+    cp_dir, X, feature_names, config = trained_checkpoint
+    matrix = extract_attention_weights(cp_dir, X, config)
+    pairs, pct = extract_top_pairs(matrix, feature_names, top_k=3, threshold_percentile=100)
+    assert pct == 100.0
+    synergistic = [p for p in pairs if p["classification"] == "synergistic"]
+    assert len(synergistic) <= 1
+
+
+def test_extract_top_pairs_synergistic_weights_exceed_antagonistic(trained_checkpoint):
+    cp_dir, X, feature_names, config = trained_checkpoint
+    matrix = extract_attention_weights(cp_dir, X, config)
+    pairs, _ = extract_top_pairs(matrix, feature_names, top_k=5, threshold_percentile=50)
+    synergistic = [p for p in pairs if p["classification"] == "synergistic"]
+    antagonistic = [p for p in pairs if p["classification"] == "antagonistic"]
+    if synergistic and antagonistic:
+        assert min(p["weight"] for p in synergistic) >= max(p["weight"] for p in antagonistic)

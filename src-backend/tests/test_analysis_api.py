@@ -101,16 +101,37 @@ async def test_get_network_with_threshold(analysis_env):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
             f"/api/v1/analysis/network/{info['checkpoint_id']}",
-            params={"threshold": 0.5},
+            params={"threshold": 50},
         )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["threshold"] == 0.5
-    for edge in data["edges"]:
-        if edge["weight"] >= 0.5:
-            assert edge["classification"] == "synergistic"
-        else:
-            assert edge["classification"] == "antagonistic"
+    assert data["threshold"] == 50.0
+    synergistic = [e for e in data["edges"] if e["classification"] == "synergistic"]
+    antagonistic = [e for e in data["edges"] if e["classification"] == "antagonistic"]
+    assert len(synergistic) > 0
+    assert len(antagonistic) > 0
+
+
+@pytest.mark.asyncio
+async def test_get_network_percentile_zero_all_synergistic(analysis_env):
+    info = analysis_env
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(
+            f"/api/v1/analysis/network/{info['checkpoint_id']}",
+            params={"threshold": 0},
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert all(e["classification"] == "synergistic" for e in data["edges"])
+
+
+@pytest.mark.asyncio
+async def test_get_network_default_threshold_is_50(analysis_env):
+    info = analysis_env
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(f"/api/v1/analysis/network/{info['checkpoint_id']}")
+    assert resp.status_code == 200
+    assert resp.json()["threshold"] == 50.0
 
 
 @pytest.mark.asyncio

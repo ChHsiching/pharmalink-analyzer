@@ -10,7 +10,7 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 async def get_attention_matrix(
     model_id: str,
     top_k: int = Query(10, ge=1, le=100),
-    threshold: float | None = Query(None),
+    threshold: int | None = Query(None, ge=0, le=100),
     service: AnalysisService = Depends(get_analysis_service),
 ):
     return service.get_attention_matrix(model_id, top_k, threshold)
@@ -27,7 +27,7 @@ async def get_heatmap_data(
 @router.get("/network/{model_id}")
 async def get_network_graph(
     model_id: str,
-    threshold: float | None = Query(None),
+    threshold: int | None = Query(None, ge=0, le=100),
     service: AnalysisService = Depends(get_analysis_service),
 ):
     return service.get_network_graph(model_id, threshold)

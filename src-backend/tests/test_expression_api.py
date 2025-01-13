@@ -1,6 +1,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.exceptions import SymbolicRegressionError
 from app.main import app
 from app.dependencies import get_expression_service
 from app.models.expression import (
@@ -174,3 +175,20 @@ async def test_tree_not_found(mock_service):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get("/api/v1/expressions/tree/not_found")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_generate_pysr_error_returns_503():
+    """SymbolicRegressionError should return 503, not unhandled 500."""
+    class MockFailingService:
+        def generate(self, model_id, top_k=10):
+            raise SymbolicRegressionError("Julia backend not installed")
+
+    app.dependency_overrides[get_expression_service] = lambda: MockFailingService()
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post("/api/v1/expressions/generate/model1")
+        assert resp.status_code == 503
+        assert "Julia" in resp.json()["detail"]
+    finally:
+        del app.dependency_overrides[get_expression_service]

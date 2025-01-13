@@ -16,6 +16,7 @@ from app.exceptions import (
     CheckpointNotFoundError,
     DatasetNotFoundError,
     ExpressionNotFoundError,
+    SymbolicRegressionError,
     UndoLimitError,
 )
 from app.services.data_loader import data_loader
@@ -49,6 +50,11 @@ async def expression_not_found_handler(request: Request, exc: ExpressionNotFound
 @app.exception_handler(UndoLimitError)
 async def undo_limit_handler(request: Request, exc: UndoLimitError):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(SymbolicRegressionError)
+async def symbolic_regression_error_handler(request: Request, exc: SymbolicRegressionError):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 app.add_middleware(

@@ -8,7 +8,8 @@
     "dev:frontend": "cd src-frontend && npx vite",
     "build:frontend": "cd src-frontend && npx vue-tsc --noEmit && npx vite build",
     "tauri:dev": "cargo tauri dev",
-    "tauri:build": "cargo tauri build"
+    "tauri:build": "cargo tauri build",
+    "start": "bash scripts/start.sh"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.1",

@@ -21,13 +21,13 @@
         分析
       </button>
       <label v-if="network" class="threshold-control">
-        阈值: {{ threshold.toFixed(2) }}
+        阈值: {{ threshold }}
         <input
           type="range"
           v-model.number="threshold"
           min="0"
-          max="1"
-          step="0.01"
+          max="100"
+          step="1"
           @change="updateNetwork"
         />
       </label>
@@ -85,7 +85,7 @@ const { heatmap, network, loading, error, fetchHeatmap, fetchNetwork } =
 const { checkpoints, fetchCheckpoints } = useTraining();
 
 const selectedCheckpoint = ref("");
-const threshold = ref(0.05);
+const threshold = ref(50);
 const networkRef = ref<HTMLElement | null>(null);
 let simulation: d3.Simulation<SimNode, d3.SimulationLinkDatum<SimNode>> | null =
   null;

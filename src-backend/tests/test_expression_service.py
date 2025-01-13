@@ -1,6 +1,8 @@
 """Tests for ExpressionService — validates orchestration of the expression pipeline."""
 
 import json
+import time
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -493,3 +495,137 @@ class TestUndo:
 
         with pytest.raises(ExpressionNotFoundError):
             service.undo("expr_unknown")  # wrong ID still raises
+
+
+# ---------------------------------------------------------------------------
+# Async generate
+# ---------------------------------------------------------------------------
+
+class TestAsyncGenerate:
+    @patch("app.services.expression.run_symbolic_regression")
+    @patch("app.services.expression.extract_pareto_equations")
+    @patch("app.services.expression.extract_best_equation")
+    @patch("app.services.expression.generate_interaction_features")
+    @patch("app.services.expression.extract_top_pairs")
+    @patch("app.services.expression.extract_attention_weights")
+    def test_start_generate_returns_task_id(
+        self, mock_attn, mock_pairs, mock_interact, mock_best,
+        mock_pareto, mock_regression, service, checkpoint_dir,
+    ):
+        from app.models.expression import TaskStatusResponse
+
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.return_value = (np.zeros((20, 7)), ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"])
+        mock_regression.return_value = _fake_model()
+        mock_best.return_value = _fake_best()
+        mock_pareto.return_value = _fake_pareto()
+
+        result = service.start_generate("model-abc")
+
+        assert isinstance(result, TaskStatusResponse)
+        assert result.task_id.startswith("task_")
+        assert result.status in ("pending", "running")
+
+    def test_get_task_result_unknown_raises_404(self, service):
+        from app.exceptions import ExpressionTaskNotFoundError
+
+        with pytest.raises(ExpressionTaskNotFoundError):
+            service.get_task_result("task_nonexistent")
+
+    @patch("app.services.expression.run_symbolic_regression")
+    @patch("app.services.expression.extract_pareto_equations")
+    @patch("app.services.expression.extract_best_equation")
+    @patch("app.services.expression.generate_interaction_features")
+    @patch("app.services.expression.extract_top_pairs")
+    @patch("app.services.expression.extract_attention_weights")
+    def test_get_task_result_completed(
+        self, mock_attn, mock_pairs, mock_interact, mock_best,
+        mock_pareto, mock_regression, service, checkpoint_dir,
+    ):
+        from app.models.expression import TaskStatusResponse
+
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.return_value = (np.zeros((20, 7)), ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"])
+        mock_regression.return_value = _fake_model()
+        mock_best.return_value = _fake_best()
+        mock_pareto.return_value = _fake_pareto()
+
+        task = service.start_generate("model-abc")
+        # Wait for background thread to complete
+        time.sleep(1)
+
+        result = service.get_task_result(task.task_id)
+        assert result.status == "completed"
+        assert result.result is not None
+        assert result.result["latex"] == "A^{2} + 1"
+
+    @patch("app.services.expression.run_symbolic_regression")
+    @patch("app.services.expression.generate_interaction_features")
+    @patch("app.services.expression.extract_top_pairs")
+    @patch("app.services.expression.extract_attention_weights")
+    def test_get_task_result_failed(
+        self, mock_attn, mock_pairs, mock_interact, mock_regression,
+        service, checkpoint_dir,
+    ):
+        from app.models.expression import TaskStatusResponse
+
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.return_value = (np.zeros((20, 7)), ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"])
+        mock_regression.side_effect = RuntimeError("Julia crashed")
+
+        task = service.start_generate("model-abc")
+        time.sleep(1)
+
+        result = service.get_task_result(task.task_id)
+        assert result.status == "failed"
+        assert result.error is not None
+
+
+class TestTTLTaskCleanup:
+    def test_cleanup_removes_old_completed_tasks(self, service):
+        """Completed tasks older than TTL should be removed."""
+        stale_task_id = "task_stale"
+        service._tasks[stale_task_id] = {
+            "status": "completed",
+            "result": {"expr_id": "expr_old"},
+            "error": None,
+            "created_at": time.time() - 1801,  # 30min + 1s ago
+        }
+
+        service._cleanup_stale_tasks(ttl_seconds=1800)
+
+        assert stale_task_id not in service._tasks
+
+    def test_cleanup_keeps_recent_tasks(self, service):
+        """Recent completed tasks should not be removed."""
+        recent_task_id = "task_recent"
+        service._tasks[recent_task_id] = {
+            "status": "completed",
+            "result": {"expr_id": "expr_new"},
+            "error": None,
+            "created_at": time.time() - 100,  # 100s ago
+        }
+
+        service._cleanup_stale_tasks(ttl_seconds=1800)
+
+        assert recent_task_id in service._tasks
+
+    def test_cleanup_keeps_running_tasks(self, service):
+        """Running/pending tasks should never be cleaned up."""
+        running_task_id = "task_running"
+        service._tasks[running_task_id] = {
+            "status": "running",
+            "result": None,
+            "error": None,
+            "created_at": time.time() - 9999,  # very old but still running
+        }
+
+        service._cleanup_stale_tasks(ttl_seconds=1800)
+
+        assert running_task_id in service._tasks

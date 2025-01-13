@@ -6,7 +6,13 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from app.exceptions import CheckpointNotFoundError, DatasetNotFoundError, ExpressionNotFoundError, UndoLimitError
+from app.exceptions import (
+    CheckpointNotFoundError,
+    DatasetNotFoundError,
+    ExpressionNotFoundError,
+    SymbolicRegressionError,
+    UndoLimitError,
+)
 
 from app.models.expression import ExpressionHistoryResponse, ExpressionResponse
 from app.services.checkpoint_resolver import CheckpointResolver
@@ -106,6 +112,99 @@ def _fake_model():
 @pytest.fixture
 def service(mock_loader, checkpoint_dir):
     return ExpressionService(resolver=CheckpointResolver(checkpoint_dir, mock_loader))
+
+
+# ---------------------------------------------------------------------------
+# _ExpressionState dataclass
+# ---------------------------------------------------------------------------
+
+class TestExpressionStateDataclass:
+    def test_expression_state_is_dataclass(self):
+        from dataclasses import is_dataclass
+        from app.services.expression import _ExpressionState
+
+        assert is_dataclass(_ExpressionState)
+
+    def test_expression_state_has_required_fields(self):
+        import sympy
+
+        from app.services.expression import _ExpressionState
+
+        state = _ExpressionState(
+            expr_id="expr_test",
+            model_id="model_test",
+            current_sympy=sympy.Symbol("A"),
+            current_latex="A",
+            current_complexity=1,
+            current_r2=0.95,
+            pareto_equations=[],
+            history=[],
+            history_index=-1,
+        )
+        assert state.expr_id == "expr_test"
+        assert state.model_id == "model_test"
+
+
+# ---------------------------------------------------------------------------
+# generate() error boundaries
+# ---------------------------------------------------------------------------
+
+class TestGenerateErrorBoundaries:
+    @patch("app.services.expression.extract_attention_weights")
+    def test_generate_wraps_attention_error(
+        self, mock_attn, service, checkpoint_dir,
+    ):
+        """Attention extraction failure should raise SymbolicRegressionError, not raw exception."""
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.side_effect = RuntimeError("CUDA out of memory")
+
+        with pytest.raises(SymbolicRegressionError):
+            service.generate("model-abc")
+
+    @patch("app.services.expression.extract_top_pairs")
+    @patch("app.services.expression.extract_attention_weights")
+    def test_generate_wraps_pairs_error(
+        self, mock_attn, mock_pairs, service, checkpoint_dir,
+    ):
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.side_effect = ValueError("bad pairs")
+
+        with pytest.raises(SymbolicRegressionError):
+            service.generate("model-abc")
+
+    @patch("app.services.expression.generate_interaction_features")
+    @patch("app.services.expression.extract_top_pairs")
+    @patch("app.services.expression.extract_attention_weights")
+    def test_generate_wraps_feature_error(
+        self, mock_attn, mock_pairs, mock_interact, service, checkpoint_dir,
+    ):
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.side_effect = RuntimeError("feature gen failed")
+
+        with pytest.raises(SymbolicRegressionError):
+            service.generate("model-abc")
+
+    @patch("app.services.expression.extract_best_equation")
+    @patch("app.services.expression.run_symbolic_regression")
+    @patch("app.services.expression.generate_interaction_features")
+    @patch("app.services.expression.extract_top_pairs")
+    @patch("app.services.expression.extract_attention_weights")
+    def test_generate_wraps_equation_extraction_error(
+        self, mock_attn, mock_pairs, mock_interact, mock_regression, mock_best,
+        service, checkpoint_dir,
+    ):
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.return_value = (np.zeros((20, 7)), ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"])
+        mock_regression.return_value = _fake_model()
+        mock_best.side_effect = KeyError("no best equation")
+
+        with pytest.raises(SymbolicRegressionError):
+            service.generate("model-abc")
 
 
 # ---------------------------------------------------------------------------

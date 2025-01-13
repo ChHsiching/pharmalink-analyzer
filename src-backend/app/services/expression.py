@@ -1,7 +1,13 @@
+import logging
 import uuid
+from dataclasses import dataclass, field
 
 import numpy as np
-from app.exceptions import ExpressionNotFoundError, UndoLimitError
+import sympy
+
+from app.exceptions import DomainError, ExpressionNotFoundError, SymbolicRegressionError, UndoLimitError
+
+logger = logging.getLogger(__name__)
 
 from app.config import CHECKPOINT_DIR
 from app.ml.attention_extractor import extract_attention_weights, extract_top_pairs
@@ -21,22 +27,17 @@ from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import data_loader as _default_data_loader
 
 
+@dataclass
 class _ExpressionState:
-    __slots__ = (
-        "expr_id",
-        "model_id",
-        "current_sympy",
-        "current_latex",
-        "current_complexity",
-        "current_r2",
-        "pareto_equations",
-        "history",
-        "history_index",
-    )
-
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+    expr_id: str
+    model_id: str
+    current_sympy: sympy.Basic
+    current_latex: str
+    current_complexity: int
+    current_r2: float
+    pareto_equations: list[dict] = field(default_factory=list)
+    history: list[dict] = field(default_factory=list)
+    history_index: int = -1
 
 
 class ExpressionService:
@@ -68,16 +69,25 @@ class ExpressionService:
 
     def generate(self, model_id: str, top_k: int = 10) -> ExpressionResponse:
         cp_dir, config = self._resolver.resolve(model_id)
-        X, y, feature_names = self._resolver.get_features_with_target(config.dataset_id)
 
-        matrix = extract_attention_weights(cp_dir, X, config)
-        pairs_raw, _ = extract_top_pairs(matrix, feature_names, top_k)
-        X_aug, aug_names = generate_interaction_features(X, feature_names, pairs_raw)
+        try:
+            X, y, feature_names = self._resolver.get_features_with_target(config.dataset_id)
+            matrix = extract_attention_weights(cp_dir, X, config)
+            pairs_raw, _ = extract_top_pairs(matrix, feature_names, top_k)
+            X_aug, aug_names = generate_interaction_features(X, feature_names, pairs_raw)
+        except Exception as e:
+            if isinstance(e, DomainError):
+                raise
+            raise SymbolicRegressionError(f"Expression pipeline failed: {e}") from e
+
         model = run_symbolic_regression(X_aug, y, aug_names)
 
-        best = extract_best_equation(model)
-        pareto = extract_pareto_equations(model)
-        r2 = float(model.score(X_aug, y))
+        try:
+            best = extract_best_equation(model)
+            pareto = extract_pareto_equations(model)
+            r2 = float(model.score(X_aug, y))
+        except Exception as e:
+            raise SymbolicRegressionError(f"Equation extraction failed: {e}") from e
 
         expr_id = f"expr_{uuid.uuid4().hex[:8]}"
         state = _ExpressionState(
@@ -88,8 +98,6 @@ class ExpressionService:
             current_complexity=best["complexity"],
             current_r2=r2,
             pareto_equations=pareto,
-            history=[],
-            history_index=-1,
         )
         self._push_history(state, "generate")
         self._states[expr_id] = state

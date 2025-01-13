@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -27,3 +29,10 @@ class ExpressionHistoryResponse(BaseModel):
     expr_id: str
     history: list[ExpressionHistoryEntry]
     current_index: int
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    result: dict[str, Any] | None = None
+    error: str | None = None

@@ -28,3 +28,9 @@ class UndoLimitError(DomainError):
 class SymbolicRegressionError(DomainError):
     def __init__(self, message: str):
         super().__init__(message)
+
+
+class ExpressionTaskNotFoundError(DomainError):
+    def __init__(self, task_id: str):
+        super().__init__(f"Task not found: {task_id}")
+        self.task_id = task_id

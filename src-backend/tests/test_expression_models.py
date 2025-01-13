@@ -39,3 +39,27 @@ def test_expression_history_response():
         current_index=0,
     )
     assert len(resp.history) == 1
+
+
+def test_task_status_response_model():
+    from app.models.expression import TaskStatusResponse
+
+    task = TaskStatusResponse(task_id="task_abc123", status="pending")
+    assert task.task_id == "task_abc123"
+    assert task.status == "pending"
+    assert task.result is None
+    assert task.error is None
+
+    completed = TaskStatusResponse(
+        task_id="task_abc123",
+        status="completed",
+        result={"expr_id": "expr_test", "model_id": "m1", "latex": "x", "complexity": 1, "r2_score": 0.9, "tree": {"type": "variable", "value": "x", "children": []}},
+    )
+    assert completed.result is not None
+
+    failed = TaskStatusResponse(
+        task_id="task_abc123",
+        status="failed",
+        error="Julia backend not installed",
+    )
+    assert failed.error is not None

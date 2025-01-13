@@ -25,3 +25,10 @@ export interface ExpressionHistoryResponse {
   history: ExpressionHistoryEntry[];
   current_index: number;
 }
+
+export interface TaskStatusResponse {
+  task_id: string;
+  status: "pending" | "running" | "completed" | "failed";
+  result: ExpressionResponse | null;
+  error: string | null;
+}

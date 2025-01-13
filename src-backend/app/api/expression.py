@@ -12,7 +12,15 @@ async def generate_expression(
     top_k: int = Query(10, ge=1, le=100),
     service: ExpressionService = Depends(get_expression_service),
 ):
-    return service.generate(model_id, top_k)
+    return service.start_generate(model_id, top_k)
+
+
+@router.get("/result/{task_id}")
+async def get_task_result(
+    task_id: str,
+    service: ExpressionService = Depends(get_expression_service),
+):
+    return service.get_task_result(task_id)
 
 
 @router.post("/simplify/{expr_id}")

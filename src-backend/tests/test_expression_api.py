@@ -13,15 +13,34 @@ from app.models.expression import (
 
 
 class MockExpressionService:
-    def generate(self, model_id, top_k=10):
-        return ExpressionResponse(
-            expr_id="expr_test1",
-            model_id=model_id,
-            latex="x_{0} + x_{1}",
-            complexity=3,
-            r2_score=0.92,
-            tree=ExpressionNode(type="variable", value="x0", children=[]),
-        )
+    def start_generate(self, model_id, top_k=10):
+        from app.models.expression import TaskStatusResponse
+        return TaskStatusResponse(task_id="task_test1", status="pending")
+
+    def get_task_result(self, task_id):
+        from app.models.expression import TaskStatusResponse
+        if task_id == "not_found":
+            raise _task_not_found("not_found")
+        if task_id == "task_completed":
+            return TaskStatusResponse(
+                task_id=task_id,
+                status="completed",
+                result={
+                    "expr_id": "expr_test1",
+                    "model_id": "model1",
+                    "latex": "x_{0} + x_{1}",
+                    "complexity": 3,
+                    "r2_score": 0.92,
+                    "tree": {"type": "variable", "value": "x0", "children": []},
+                },
+            )
+        if task_id == "task_failed":
+            return TaskStatusResponse(
+                task_id=task_id,
+                status="failed",
+                error="Julia backend not installed",
+            )
+        return TaskStatusResponse(task_id=task_id, status="running")
 
     def simplify(self, expr_id):
         if expr_id == "not_found":
@@ -101,6 +120,12 @@ def _not_found(expr_id: str):
     raise ExpressionNotFoundError(expr_id)
 
 
+def _task_not_found(task_id: str):
+    from app.exceptions import ExpressionTaskNotFoundError
+
+    raise ExpressionTaskNotFoundError(task_id)
+
+
 @pytest.fixture
 def mock_service():
     app.dependency_overrides[get_expression_service] = lambda: MockExpressionService()
@@ -114,9 +139,8 @@ async def test_generate_expression(mock_service):
         resp = await client.post("/api/v1/expressions/generate/model1")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["expr_id"] == "expr_test1"
-    assert "latex" in data
-    assert "complexity" in data
+    assert data["task_id"] == "task_test1"
+    assert data["status"] == "pending"
 
 
 @pytest.mark.asyncio
@@ -181,7 +205,7 @@ async def test_tree_not_found(mock_service):
 async def test_generate_pysr_error_returns_503():
     """SymbolicRegressionError should return 503, not unhandled 500."""
     class MockFailingService:
-        def generate(self, model_id, top_k=10):
+        def start_generate(self, model_id, top_k=10):
             raise SymbolicRegressionError("Julia backend not installed")
 
     app.dependency_overrides[get_expression_service] = lambda: MockFailingService()
@@ -192,3 +216,38 @@ async def test_generate_pysr_error_returns_503():
         assert "Julia" in resp.json()["detail"]
     finally:
         del app.dependency_overrides[get_expression_service]
+
+
+@pytest.mark.asyncio
+async def test_get_task_result_running(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions/result/task_running")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "running"
+
+
+@pytest.mark.asyncio
+async def test_get_task_result_completed(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions/result/task_completed")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "completed"
+    assert data["result"]["latex"] == "x_{0} + x_{1}"
+
+
+@pytest.mark.asyncio
+async def test_get_task_result_failed(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions/result/task_failed")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "failed"
+    assert "Julia" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_get_task_result_not_found(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions/result/not_found")
+    assert resp.status_code == 404

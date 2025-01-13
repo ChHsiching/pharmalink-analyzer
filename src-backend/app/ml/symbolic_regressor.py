@@ -29,7 +29,13 @@ def generate_interaction_features(
 
 def run_symbolic_regression(X, y, feature_names, niterations=20):
     """Run PySR symbolic regression on the given data."""
-    from pysr import PySRRegressor
+    try:
+        from pysr import PySRRegressor
+    except ImportError as e:
+        raise SymbolicRegressionError(
+            "Julia backend not installed. "
+            "Install with: pip install pysr"
+        ) from e
 
     model = PySRRegressor(
         model_selection="best",
@@ -43,7 +49,18 @@ def run_symbolic_regression(X, y, feature_names, niterations=20):
         progress=False,
         verbosity=0,
     )
-    model.fit(X, y, variable_names=feature_names)
+
+    try:
+        model.fit(X, y, variable_names=feature_names)
+    except RuntimeError as e:
+        raise SymbolicRegressionError(
+            f"Symbolic regression failed to converge: {e}"
+        ) from e
+    except Exception as e:
+        raise SymbolicRegressionError(
+            f"Symbolic regression error: {e}"
+        ) from e
+
     return model
 
 

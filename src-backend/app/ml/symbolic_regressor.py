@@ -1,5 +1,7 @@
 import numpy as np
 
+from app.exceptions import SymbolicRegressionError
+
 
 def generate_interaction_features(
     X: np.ndarray,
@@ -25,7 +27,7 @@ def generate_interaction_features(
     return np.hstack([X, X_interactions]), list(feature_names) + interaction_names
 
 
-def run_symbolic_regression(X, y, feature_names, niterations=40):
+def run_symbolic_regression(X, y, feature_names, niterations=20):
     """Run PySR symbolic regression on the given data."""
     from pysr import PySRRegressor
 
@@ -34,9 +36,9 @@ def run_symbolic_regression(X, y, feature_names, niterations=40):
         niterations=niterations,
         binary_operators=["+", "-", "*"],
         unary_operators=["sin", "cos", "exp"],
-        maxsize=20,
-        populations=15,
-        population_size=30,
+        maxsize=15,
+        populations=5,
+        population_size=15,
         temp_equation_file=True,
         progress=False,
         verbosity=0,

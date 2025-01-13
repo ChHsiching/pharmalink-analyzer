@@ -1,13 +1,19 @@
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
 import sympy
+from unittest.mock import MagicMock, patch
 
 from app.ml.symbolic_regressor import (
     generate_interaction_features,
+    run_symbolic_regression,
     extract_best_equation,
     extract_pareto_equations,
 )
+
+from app.exceptions import SymbolicRegressionError
 
 
 @pytest.fixture
@@ -86,3 +92,34 @@ def test_extract_pareto_equations():
     results = extract_pareto_equations(model)
     assert len(results) == 3
     assert results[0]["complexity"] == 1
+
+
+def test_julia_missing_raises_symbolic_regression_error():
+    """When pysr cannot be imported, raise SymbolicRegressionError."""
+    X = np.zeros((10, 3), dtype=np.float32)
+    y = np.zeros(10, dtype=np.float32)
+    with patch.dict(sys.modules, {"pysr": None}):
+        with pytest.raises(SymbolicRegressionError, match="Julia backend"):
+            run_symbolic_regression(X, y, ["a", "b", "c"])
+
+
+def test_convergence_failure_raises_symbolic_regression_error():
+    """When PySR fails to converge, raise SymbolicRegressionError."""
+    X = np.zeros((10, 3), dtype=np.float32)
+    y = np.zeros(10, dtype=np.float32)
+    mock_cls = MagicMock()
+    mock_cls.return_value.fit.side_effect = RuntimeError("No equations found")
+    with patch("pysr.PySRRegressor", mock_cls):
+        with pytest.raises(SymbolicRegressionError, match="converge"):
+            run_symbolic_regression(X, y, ["a", "b", "c"])
+
+
+def test_general_pysr_error_raises_symbolic_regression_error():
+    """When PySR raises an unexpected error, raise SymbolicRegressionError."""
+    X = np.zeros((10, 3), dtype=np.float32)
+    y = np.zeros(10, dtype=np.float32)
+    mock_cls = MagicMock()
+    mock_cls.return_value.fit.side_effect = ValueError("Bad data shape")
+    with patch("pysr.PySRRegressor", mock_cls):
+        with pytest.raises(SymbolicRegressionError, match="error"):
+            run_symbolic_regression(X, y, ["a", "b", "c"])

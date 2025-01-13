@@ -23,3 +23,8 @@ class ExpressionNotFoundError(DomainError):
 class UndoLimitError(DomainError):
     def __init__(self):
         super().__init__("No more history to undo")
+
+
+class SymbolicRegressionError(DomainError):
+    def __init__(self, message: str):
+        super().__init__(message)

@@ -1,5 +1,7 @@
 import numpy as np
 
+from app.exceptions import SymbolicRegressionError
+
 
 def generate_interaction_features(
     X: np.ndarray,
@@ -25,23 +27,40 @@ def generate_interaction_features(
     return np.hstack([X, X_interactions]), list(feature_names) + interaction_names
 
 
-def run_symbolic_regression(X, y, feature_names, niterations=40):
+def run_symbolic_regression(X, y, feature_names, niterations=20):
     """Run PySR symbolic regression on the given data."""
-    from pysr import PySRRegressor
+    try:
+        from pysr import PySRRegressor
+    except ImportError as e:
+        raise SymbolicRegressionError(
+            "Julia backend not installed. "
+            "Install with: pip install pysr"
+        ) from e
 
     model = PySRRegressor(
         model_selection="best",
         niterations=niterations,
         binary_operators=["+", "-", "*"],
         unary_operators=["sin", "cos", "exp"],
-        maxsize=20,
-        populations=15,
-        population_size=30,
+        maxsize=15,
+        populations=5,
+        population_size=15,
         temp_equation_file=True,
         progress=False,
         verbosity=0,
     )
-    model.fit(X, y, variable_names=feature_names)
+
+    try:
+        model.fit(X, y, variable_names=feature_names)
+    except RuntimeError as e:
+        raise SymbolicRegressionError(
+            f"Symbolic regression failed to converge: {e}"
+        ) from e
+    except Exception as e:
+        raise SymbolicRegressionError(
+            f"Symbolic regression error: {e}"
+        ) from e
+
     return model
 
 

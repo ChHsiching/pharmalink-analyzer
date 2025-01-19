@@ -35,10 +35,10 @@ except ImportError:
 PRESET_DATASETS = [
     "Leaf50HDL",
     "Leaf100HDL",
-    "leaf100od",
-    "fruit50tc",
-    "fruit-ldl",
-    "fruit50tg",
+    "leaf100od-0817",
+    "fruit50tc-0817",
+    "fruit-ldl-0817",
+    "fruit50tg-0817",
 ]
 
 TRAINING_CONFIG = {
@@ -311,6 +311,8 @@ def validate_dataset(
     # -- AC9: Undo/redo ------------------------------------------------------
     if expr_id is not None:
         try:
+            # Simplify first to create a 2nd history entry so undo has somewhere to go
+            client.post(f"/expressions/simplify/{expr_id}")
             resp = client.post(f"/expressions/undo/{expr_id}", params={"steps": 1})
             if resp.status_code == 200:
                 results.append(ACResult("AC9", "Undo/redo", "PASS"))

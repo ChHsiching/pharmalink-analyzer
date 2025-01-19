@@ -45,6 +45,7 @@ def run_symbolic_regression(X, y, feature_names, niterations=20):
         maxsize=15,
         populations=5,
         population_size=15,
+        tournament_selection_n=10,
         temp_equation_file=True,
         progress=False,
         verbosity=0,
@@ -65,14 +66,20 @@ def run_symbolic_regression(X, y, feature_names, niterations=20):
 
 
 def extract_best_equation(model) -> dict:
-    """Extract the best equation from a fitted PySR model."""
-    best_idx = model.equations_.query("pick == True").index[0]
-    row = model.equations_.iloc[best_idx]
+    """Extract the best equation from a fitted PySR model.
+
+    Uses model.sympy() and model.latex() which respect model_selection
+    strategy, then finds the matching row by index.
+    """
+    best_idx = 0
+    if "pick" in model.equations_.columns:
+        best_idx = model.equations_.query("pick == True").index[0]
+    best_row = model.equations_.iloc[best_idx]
     return {
         "sympy_expr": model.sympy(),
         "latex": model.latex(),
-        "complexity": int(row["complexity"]),
-        "loss": float(row["loss"]),
+        "complexity": int(best_row["complexity"]),
+        "loss": float(best_row["loss"]),
     }
 
 

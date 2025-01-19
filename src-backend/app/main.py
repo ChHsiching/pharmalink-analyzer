@@ -1,5 +1,7 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,10 +25,19 @@ from app.exceptions import (
 from app.services.data_loader import data_loader
 from app.dependencies import get_training_service
 
+logger = logging.getLogger(__name__)
+DATA_DIR: Path = Path(__file__).parent.parent.parent / "docs" / "csv_data"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    data_loader.load_preset_datasets()
+    if not DATA_DIR.exists():
+        logger.error("DATA_DIR does not exist: %s", DATA_DIR)
+    metas = data_loader.load_preset_datasets()
+    if not metas:
+        logger.warning("No preset datasets loaded from %s", DATA_DIR)
+    else:
+        logger.info("Loaded %d preset datasets from %s", len(metas), DATA_DIR)
     yield
 
 

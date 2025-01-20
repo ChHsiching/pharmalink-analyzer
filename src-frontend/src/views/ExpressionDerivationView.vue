@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import katex from "katex";
 import { useTraining } from "@/composables/useTraining";
 import { useExpression } from "@/composables/useExpression";
@@ -56,6 +56,7 @@ const {
   expression, history, loading, error,
   generateExpression, simplifyExpression, optimizeExpression,
   fetchHistory, undoExpression,
+  stopPolling,
 } = useExpression();
 
 const canUndo = computed(() => history.value ? history.value.current_index > 0 : false);
@@ -98,6 +99,7 @@ function renderLatex() {
 
 watch(() => expression.value?.latex, () => nextTick(renderLatex));
 onMounted(() => { fetchCheckpoints(); });
+onUnmounted(() => { stopPolling(); });
 </script>
 
 <style scoped>

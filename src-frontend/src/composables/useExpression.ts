@@ -117,5 +117,6 @@ export function useExpression() {
     optimizeExpression,
     fetchHistory,
     undoExpression,
+    stopPolling,
   };
 }

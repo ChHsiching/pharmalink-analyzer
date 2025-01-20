@@ -15,7 +15,7 @@ import pytest
 import sympy
 import torch
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from app.main import app
 from app.dependencies import (
@@ -26,6 +26,7 @@ from app.dependencies import (
 from app.services.analysis import AnalysisService
 from app.services.evaluation import EvaluationService
 from app.services.expression import ExpressionService
+from app.services.expression_pipeline import PipelineResult
 from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader
 
@@ -60,6 +61,20 @@ def _mock_pysr_model():
     model = MagicMock()
     model.score.return_value = 0.85
     return model
+
+
+def _mock_pipeline():
+    """Return a mock ExpressionPipeline returning a default PipelineResult."""
+    pipeline = MagicMock()
+    pipeline.run.return_value = PipelineResult(
+        sympy_expr=sympy.Symbol("comp_0"),
+        latex="x_{0}",
+        complexity=1,
+        loss=0.05,
+        r2_score=0.85,
+        pareto_equations=_mock_pareto_equations(),
+    )
+    return pipeline
 
 
 # ---------------------------------------------------------------------------
@@ -118,9 +133,8 @@ def e2e_env(tmp_path, make_checkpoint):
     analysis_svc = AnalysisService(resolver=resolver)
     evaluation_svc = EvaluationService(resolver=resolver)
 
-    # ExpressionService needs heavy monkeypatching — we patch at the
-    # app.services.expression module level so generate() uses our stubs.
-    expression_svc = ExpressionService(resolver=resolver)
+    # ExpressionService uses a mock pipeline to avoid PySR/Julia dependency.
+    expression_svc = ExpressionService(resolver=resolver, pipeline=_mock_pipeline())
 
     app.dependency_overrides[get_analysis_service] = lambda: analysis_svc
     app.dependency_overrides[get_evaluation_service] = lambda: evaluation_svc
@@ -292,32 +306,9 @@ async def test_loss_curve_has_history(e2e_env):
 # ===========================================================================
 
 @pytest.mark.asyncio
-@patch("app.services.expression.extract_pareto_equations", return_value=_mock_pareto_equations())
-@patch("app.services.expression.extract_best_equation", return_value=_mock_best_expression())
-@patch("app.services.expression.run_symbolic_regression", return_value=_mock_pysr_model())
-@patch("app.services.expression.generate_interaction_features")
-@patch("app.services.expression.extract_top_pairs")
-@patch("app.services.expression.extract_attention_weights")
-async def test_expression_generate_and_simplify_chain(
-    mock_attn, mock_pairs, mock_interact, mock_regression,
-    mock_best, mock_pareto, e2e_env,
-):
+async def test_expression_generate_and_simplify_chain(e2e_env):
     """Generate (async task, poll until completed), then simplify; verify both valid."""
     info = e2e_env
-
-    # Set up mocks for generate pipeline
-    n = info["feature_count"]
-    rng = np.random.default_rng(42)
-    fake_matrix = (rng.standard_normal((n, n))).astype(np.float32)
-    mock_attn.return_value = fake_matrix
-    mock_pairs.return_value = (
-        [{"source": "comp_0", "target": "comp_1", "weight": 0.9, "classification": "synergistic"}],
-        0.5,
-    )
-    mock_interact.return_value = (
-        np.zeros((info["n_samples"], n + 2), dtype=np.float32),
-        [f"comp_{i}" for i in range(n)] + ["comp_0_mul_comp_1", "comp_0_div_comp_1"],
-    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         expr_id, gen_result = await _generate_expression(client, info["checkpoint_id"])
@@ -339,31 +330,9 @@ async def test_expression_generate_and_simplify_chain(
 
 
 @pytest.mark.asyncio
-@patch("app.services.expression.extract_pareto_equations", return_value=_mock_pareto_equations())
-@patch("app.services.expression.extract_best_equation", return_value=_mock_best_expression())
-@patch("app.services.expression.run_symbolic_regression", return_value=_mock_pysr_model())
-@patch("app.services.expression.generate_interaction_features")
-@patch("app.services.expression.extract_top_pairs")
-@patch("app.services.expression.extract_attention_weights")
-async def test_expression_undo_redo_chain(
-    mock_attn, mock_pairs, mock_interact, mock_regression,
-    mock_best, mock_pareto, e2e_env,
-):
+async def test_expression_undo_redo_chain(e2e_env):
     """Generate -> simplify -> undo (original) -> simplify again (redo)."""
     info = e2e_env
-
-    n = info["feature_count"]
-    rng = np.random.default_rng(42)
-    fake_matrix = (rng.standard_normal((n, n))).astype(np.float32)
-    mock_attn.return_value = fake_matrix
-    mock_pairs.return_value = (
-        [{"source": "comp_0", "target": "comp_1", "weight": 0.9, "classification": "synergistic"}],
-        0.5,
-    )
-    mock_interact.return_value = (
-        np.zeros((info["n_samples"], n + 2), dtype=np.float32),
-        [f"comp_{i}" for i in range(n)] + ["comp_0_mul_comp_1", "comp_0_div_comp_1"],
-    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         expr_id, gen_result = await _generate_expression(client, info["checkpoint_id"])
@@ -386,31 +355,9 @@ async def test_expression_undo_redo_chain(
 
 
 @pytest.mark.asyncio
-@patch("app.services.expression.extract_pareto_equations", return_value=_mock_pareto_equations())
-@patch("app.services.expression.extract_best_equation", return_value=_mock_best_expression())
-@patch("app.services.expression.run_symbolic_regression", return_value=_mock_pysr_model())
-@patch("app.services.expression.generate_interaction_features")
-@patch("app.services.expression.extract_top_pairs")
-@patch("app.services.expression.extract_attention_weights")
-async def test_expression_tree_and_history(
-    mock_attn, mock_pairs, mock_interact, mock_regression,
-    mock_best, mock_pareto, e2e_env,
-):
+async def test_expression_tree_and_history(e2e_env):
     """After generation, tree has type+value, history has list with current_index."""
     info = e2e_env
-
-    n = info["feature_count"]
-    rng = np.random.default_rng(42)
-    fake_matrix = (rng.standard_normal((n, n))).astype(np.float32)
-    mock_attn.return_value = fake_matrix
-    mock_pairs.return_value = (
-        [{"source": "comp_0", "target": "comp_1", "weight": 0.9, "classification": "synergistic"}],
-        0.5,
-    )
-    mock_interact.return_value = (
-        np.zeros((info["n_samples"], n + 2), dtype=np.float32),
-        [f"comp_{i}" for i in range(n)] + ["comp_0_mul_comp_1", "comp_0_div_comp_1"],
-    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         expr_id, gen_result = await _generate_expression(client, info["checkpoint_id"])
@@ -434,31 +381,9 @@ async def test_expression_tree_and_history(
 
 
 @pytest.mark.asyncio
-@patch("app.services.expression.extract_pareto_equations", return_value=_mock_pareto_equations())
-@patch("app.services.expression.extract_best_equation", return_value=_mock_best_expression())
-@patch("app.services.expression.run_symbolic_regression", return_value=_mock_pysr_model())
-@patch("app.services.expression.generate_interaction_features")
-@patch("app.services.expression.extract_top_pairs")
-@patch("app.services.expression.extract_attention_weights")
-async def test_expression_history_tracks_multiple_operations(
-    mock_attn, mock_pairs, mock_interact, mock_regression,
-    mock_best, mock_pareto, e2e_env,
-):
+async def test_expression_history_tracks_multiple_operations(e2e_env):
     """History accumulates entries across generate, simplify, undo; index stays correct."""
     info = e2e_env
-
-    n = info["feature_count"]
-    rng = np.random.default_rng(42)
-    fake_matrix = (rng.standard_normal((n, n))).astype(np.float32)
-    mock_attn.return_value = fake_matrix
-    mock_pairs.return_value = (
-        [{"source": "comp_0", "target": "comp_1", "weight": 0.9, "classification": "synergistic"}],
-        0.5,
-    )
-    mock_interact.return_value = (
-        np.zeros((info["n_samples"], n + 2), dtype=np.float32),
-        [f"comp_{i}" for i in range(n)] + ["comp_0_mul_comp_1", "comp_0_div_comp_1"],
-    )
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         expr_id, _ = await _generate_expression(client, info["checkpoint_id"])

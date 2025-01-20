@@ -35,10 +35,10 @@ except ImportError:
 PRESET_DATASETS = [
     "Leaf50HDL",
     "Leaf100HDL",
-    "leaf100od",
-    "fruit50tc",
-    "fruit-ldl",
-    "fruit50tg",
+    "leaf100od-0817",
+    "fruit50tc-0817",
+    "fruit-ldl-0817",
+    "fruit50tg-0817",
 ]
 
 TRAINING_CONFIG = {

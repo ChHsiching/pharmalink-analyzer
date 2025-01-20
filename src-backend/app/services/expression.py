@@ -1,26 +1,13 @@
+"""ExpressionService — facade orchestrating pipeline, state, and async tasks."""
+
 import logging
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
-import sympy
-
-from app.exceptions import DomainError, ExpressionNotFoundError, ExpressionTaskNotFoundError, SymbolicRegressionError, UndoLimitError
-
-logger = logging.getLogger(__name__)
-
-from app.config import CHECKPOINT_DIR
-from app.ml.attention_extractor import extract_attention_weights, extract_top_pairs
+from app.exceptions import ExpressionTaskNotFoundError
 from app.ml.expression_tree import expr_to_latex, get_complexity, simplify_expr, sympy_to_tree
-from app.ml.symbolic_regressor import (
-    extract_best_equation,
-    extract_pareto_equations,
-    generate_interaction_features,
-    run_symbolic_regression,
-)
 from app.models.expression import (
     ExpressionHistoryEntry,
     ExpressionHistoryResponse,
@@ -28,30 +15,26 @@ from app.models.expression import (
     TaskStatusResponse,
 )
 from app.services.checkpoint_resolver import CheckpointResolver
-from app.services.data_loader import data_loader as _default_data_loader
+from app.services.expression_pipeline import ExpressionPipeline
+from app.services.expression_state import ExpressionState, ExpressionStateManager
 
-
-@dataclass
-class _ExpressionState:
-    expr_id: str
-    model_id: str
-    current_sympy: sympy.Basic
-    current_latex: str
-    current_complexity: int
-    current_r2: float
-    pareto_equations: list[dict] = field(default_factory=list)
-    history: list[dict] = field(default_factory=list)
-    history_index: int = -1
+logger = logging.getLogger(__name__)
 
 
 class ExpressionService:
-    def __init__(self, resolver: CheckpointResolver):
+    def __init__(
+        self,
+        resolver: CheckpointResolver,
+        pipeline: ExpressionPipeline | None = None,
+        state_manager: ExpressionStateManager | None = None,
+    ):
         self._resolver = resolver
-        self._states: dict[str, _ExpressionState] = {}
+        self._pipeline = pipeline or ExpressionPipeline(resolver)
+        self._state = state_manager or ExpressionStateManager()
         self._tasks: dict[str, dict[str, Any]] = {}
         self._tasks_lock = threading.Lock()
 
-    def _to_response(self, state: _ExpressionState) -> ExpressionResponse:
+    def _to_response(self, state: ExpressionState) -> ExpressionResponse:
         return ExpressionResponse(
             expr_id=state.expr_id,
             model_id=state.model_id,
@@ -61,52 +44,21 @@ class ExpressionService:
             tree=sympy_to_tree(state.current_sympy),
         )
 
-    def _push_history(self, state: _ExpressionState, operation: str):
-        entry = {
-            "operation": operation,
-            "sympy": state.current_sympy,
-            "latex": state.current_latex,
-            "complexity": state.current_complexity,
-            "r2": state.current_r2,
-        }
-        state.history = state.history[: state.history_index + 1]
-        state.history.append(entry)
-        state.history_index = len(state.history) - 1
-
     def generate(self, model_id: str, top_k: int = 10) -> ExpressionResponse:
-        cp_dir, config = self._resolver.resolve(model_id)
-
-        try:
-            X, y, feature_names = self._resolver.get_features_with_target(config.dataset_id)
-            matrix = extract_attention_weights(cp_dir, X, config)
-            pairs_raw, _ = extract_top_pairs(matrix, feature_names, top_k)
-            X_aug, aug_names = generate_interaction_features(X, feature_names, pairs_raw)
-        except Exception as e:
-            if isinstance(e, DomainError):
-                raise
-            raise SymbolicRegressionError(f"Expression pipeline failed: {e}") from e
-
-        model = run_symbolic_regression(X_aug, y, aug_names)
-
-        try:
-            best = extract_best_equation(model)
-            pareto = extract_pareto_equations(model)
-            r2 = float(model.score(X_aug, y))
-        except Exception as e:
-            raise SymbolicRegressionError(f"Equation extraction failed: {e}") from e
+        result = self._pipeline.run(model_id, top_k)
 
         expr_id = f"expr_{uuid.uuid4().hex[:8]}"
-        state = _ExpressionState(
+        state = ExpressionState(
             expr_id=expr_id,
             model_id=model_id,
-            current_sympy=best["sympy_expr"],
-            current_latex=best["latex"],
-            current_complexity=best["complexity"],
-            current_r2=r2,
-            pareto_equations=pareto,
+            current_sympy=result.sympy_expr,
+            current_latex=result.latex,
+            current_complexity=result.complexity,
+            current_r2=result.r2_score,
+            pareto_equations=result.pareto_equations,
         )
-        self._push_history(state, "generate")
-        self._states[expr_id] = state
+        self._state.push_history(state, "generate")
+        self._state.put(state)
         return self._to_response(state)
 
     def start_generate(self, model_id: str, top_k: int = 10) -> TaskStatusResponse:
@@ -172,20 +124,16 @@ class ExpressionService:
                 logger.info("Cleaned up stale task %s", tid)
 
     def simplify(self, expr_id: str) -> ExpressionResponse:
-        state = self._states.get(expr_id)
-        if state is None:
-            raise ExpressionNotFoundError(expr_id)
+        state = self._state.get(expr_id)
         simplified = simplify_expr(state.current_sympy)
         state.current_sympy = simplified
         state.current_latex = expr_to_latex(simplified)
         state.current_complexity = get_complexity(simplified)
-        self._push_history(state, "simplify")
+        self._state.push_history(state, "simplify")
         return self._to_response(state)
 
     def optimize(self, expr_id: str) -> ExpressionResponse:
-        state = self._states.get(expr_id)
-        if state is None:
-            raise ExpressionNotFoundError(expr_id)
+        state = self._state.get(expr_id)
 
         current_idx = 0
         for i, eq in enumerate(state.pareto_equations):
@@ -201,45 +149,29 @@ class ExpressionService:
         state.current_sympy = chosen["sympy_expr"]
         state.current_latex = chosen["latex"]
         state.current_complexity = chosen["complexity"]
-        self._push_history(state, "optimize")
+        self._state.push_history(state, "optimize")
         return self._to_response(state)
 
     def get_tree(self, expr_id: str) -> ExpressionResponse:
-        state = self._states.get(expr_id)
-        if state is None:
-            raise ExpressionNotFoundError(expr_id)
+        state = self._state.get(expr_id)
         return self._to_response(state)
 
     def get_history(self, expr_id: str) -> ExpressionHistoryResponse:
-        state = self._states.get(expr_id)
-        if state is None:
-            raise ExpressionNotFoundError(expr_id)
-        entries = [
-            ExpressionHistoryEntry(
-                operation=h["operation"],
-                latex=h["latex"],
-                complexity=h["complexity"],
-                r2_score=h["r2"],
-            )
-            for h in state.history
-        ]
+        state = self._state.get(expr_id)
         return ExpressionHistoryResponse(
             expr_id=state.expr_id,
-            history=entries,
+            history=[
+                ExpressionHistoryEntry(
+                    operation=h["operation"],
+                    latex=h["latex"],
+                    complexity=h["complexity"],
+                    r2_score=h["r2"],
+                )
+                for h in state.history
+            ],
             current_index=state.history_index,
         )
 
     def undo(self, expr_id: str, steps: int = 1) -> ExpressionResponse:
-        state = self._states.get(expr_id)
-        if state is None:
-            raise ExpressionNotFoundError(expr_id)
-        target = max(0, min(state.history_index - steps, len(state.history) - 1))
-        if target == state.history_index:
-            raise UndoLimitError()
-        h = state.history[target]
-        state.history_index = target
-        state.current_sympy = h["sympy"]
-        state.current_latex = h["latex"]
-        state.current_complexity = h["complexity"]
-        state.current_r2 = h["r2"]
+        state = self._state.undo(expr_id, steps)
         return self._to_response(state)

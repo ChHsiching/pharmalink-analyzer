@@ -26,6 +26,8 @@ class CheckpointManager:
         val_loss: float,
         scaler: StandardScaler,
         progress: list[TrainingProgress],
+        fold_states: list[dict[str, torch.Tensor]] | None = None,
+        fold_scalers: list[StandardScaler] | None = None,
     ) -> Path:
         """Save a training checkpoint to disk. Returns the checkpoint directory path."""
         self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -43,5 +45,13 @@ class CheckpointManager:
         if progress:
             metrics_data["history"] = [p.model_dump() for p in progress]
         (ckpt_path / "metrics.json").write_text(json.dumps(metrics_data))
+
+        # Per-fold models and scalers
+        if fold_states is not None and fold_scalers is not None:
+            for i, (fstate, fscaler) in enumerate(zip(fold_states, fold_scalers)):
+                torch.save(fstate, ckpt_path / f"model_fold{i}.pt")
+                save_scaler_params(
+                    ckpt_path / f"scaler_fold{i}.json", fscaler.mean_, fscaler.scale_,
+                )
 
         return ckpt_path

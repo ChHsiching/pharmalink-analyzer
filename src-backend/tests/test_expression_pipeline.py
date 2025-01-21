@@ -200,6 +200,52 @@ class TestPipelineRun:
         with pytest.raises(DatasetNotFoundError):
             pipeline.run("model-abc")
 
+    @patch("app.services.expression_pipeline.run_symbolic_regression")
+    @patch("app.services.expression_pipeline.extract_pareto_equations")
+    @patch("app.services.expression_pipeline.extract_best_equation")
+    @patch("app.services.expression_pipeline.generate_interaction_features")
+    @patch("app.services.expression_pipeline.extract_top_pairs")
+    @patch("app.services.expression_pipeline.extract_attention_weights")
+    def test_uses_train_test_split_for_r2(
+        self, mock_attn, mock_pairs, mock_interact, mock_best,
+        mock_pareto, mock_regression, pipeline, checkpoint_dir,
+    ):
+        """Verify the pipeline splits data into train/test before fitting and scoring.
+
+        The pipeline must evaluate out-of-sample R2 on a held-out test set,
+        not on the training data used for symbolic regression.
+        """
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.return_value = (
+            np.zeros((20, 7)),
+            ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
+        )
+        fake_model = _fake_model()
+        mock_regression.return_value = fake_model
+        mock_best.return_value = _fake_best()
+        mock_pareto.return_value = _fake_pareto()
+
+        pipeline.run("model-abc")
+
+        # run_symbolic_regression should receive a training subset (< 20 rows)
+        X_train = mock_regression.call_args[0][0]
+        y_train = mock_regression.call_args[0][1]
+        assert X_train.shape[0] < 20, (
+            f"Expected train rows < 20, got {X_train.shape[0]}"
+        )
+
+        # model.score should receive the held-out test subset
+        X_test = fake_model.score.call_args[0][0]
+        y_test = fake_model.score.call_args[0][1]
+
+        # train + test must equal the full dataset (20 rows)
+        assert X_train.shape[0] + X_test.shape[0] == 20, (
+            f"train ({X_train.shape[0]}) + test ({X_test.shape[0]}) != 20"
+        )
+
+
 
 # ---------------------------------------------------------------------------
 # TestPipelineErrorWrapping

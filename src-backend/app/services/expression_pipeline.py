@@ -10,6 +10,8 @@ from dataclasses import dataclass
 
 import sympy
 
+from sklearn.model_selection import train_test_split
+
 from app.exceptions import DomainError, SymbolicRegressionError
 from app.ml.attention_extractor import extract_attention_weights, extract_top_pairs
 from app.ml.symbolic_regressor import (
@@ -72,14 +74,17 @@ class ExpressionPipeline:
                 f"Expression pipeline failed: {e}"
             ) from e
 
-        # Step 6: NOT wrapped — let SymbolicRegressionError propagate directly
-        model = run_symbolic_regression(X_aug, y, aug_names)
+        # Step 6: Split for honest out-of-sample R² evaluation
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_aug, y, test_size=0.2, random_state=42,
+        )
+        model = run_symbolic_regression(X_train, y_train, aug_names)
 
         # Steps 7–9: any Exception → SymbolicRegressionError
         try:
             best = extract_best_equation(model)
             pareto = extract_pareto_equations(model)
-            r2 = float(model.score(X_aug, y))
+            r2 = float(model.score(X_test, y_test))
         except Exception as e:
             raise SymbolicRegressionError(
                 f"Equation extraction failed: {e}"

@@ -23,6 +23,9 @@ class TrainingResult:
     scaler: StandardScaler | None
     best_loss: float
     stopped: bool = False
+    fold_states: list[dict[str, torch.Tensor]] | None = None
+    fold_scalers: list[StandardScaler] | None = None
+    best_fold_idx: int | None = None
 
 
 class TrainingPipeline:
@@ -51,6 +54,9 @@ class TrainingPipeline:
         best_state = None
         best_loss = float("inf")
         best_scaler = None
+        fold_states: list[dict[str, torch.Tensor]] = []
+        fold_scalers: list[StandardScaler] = []
+        best_fold_idx: int | None = None
 
         for fold_idx, (train_idx, val_idx) in enumerate(kfold.split(X)):
             if _stopped():
@@ -59,6 +65,9 @@ class TrainingPipeline:
                     scaler=best_scaler,
                     best_loss=best_loss,
                     stopped=True,
+                    fold_states=fold_states or None,
+                    fold_scalers=fold_scalers or None,
+                    best_fold_idx=best_fold_idx,
                 )
 
             scaler = StandardScaler()
@@ -98,6 +107,9 @@ class TrainingPipeline:
                         scaler=best_scaler,
                         best_loss=best_loss,
                         stopped=True,
+                        fold_states=fold_states or None,
+                        fold_scalers=fold_scalers or None,
+                        best_fold_idx=best_fold_idx,
                     )
 
                 model.train()
@@ -135,13 +147,20 @@ class TrainingPipeline:
                     if patience_counter >= config.early_stopping_patience:
                         break
 
+            fold_states.append({k: v.clone() for k, v in model.state_dict().items()})
+            fold_scalers.append(scaler)
+
             if best_fold_loss < best_loss:
                 best_loss = best_fold_loss
                 best_state = {k: v.clone() for k, v in model.state_dict().items()}
                 best_scaler = scaler
+                best_fold_idx = fold_idx
 
         return TrainingResult(
             model_state=best_state,
             scaler=best_scaler,
             best_loss=best_loss,
+            fold_states=fold_states or None,
+            fold_scalers=fold_scalers or None,
+            best_fold_idx=best_fold_idx,
         )

@@ -53,7 +53,7 @@ def config():
 
 
 # ---------------------------------------------------------------------------
-# Save — file creation
+# Save — file creation (original tests)
 # ---------------------------------------------------------------------------
 
 class TestCheckpointManagerSave:
@@ -99,3 +99,79 @@ class TestCheckpointManagerSave:
     def test_returns_checkpoint_path(self, manager, checkpoint_dir, config, model_state, scaler):
         result = manager.save("task1", config, model_state, 0.1, scaler, [])
         assert result == checkpoint_dir / "ds1_task1"
+
+
+# ---------------------------------------------------------------------------
+# Save — per-fold files (new tests)
+# ---------------------------------------------------------------------------
+
+def _make_fold_data(n_folds=3, n_features=5):
+    rng = np.random.default_rng(42)
+    fold_states = []
+    fold_scalers = []
+    for i in range(n_folds):
+        state = {f"layer_{i}": torch.randn(4, n_features)}
+        scaler = StandardScaler()
+        scaler.fit(rng.standard_normal((20, n_features)).astype(np.float32))
+        fold_states.append(state)
+        fold_scalers.append(scaler)
+    return fold_states, fold_scalers
+
+
+def _make_base_state():
+    state = {f"w_{i}": torch.randn(2, 3) for i in range(3)}
+    scaler = StandardScaler()
+    scaler.fit(np.random.randn(10, 5).astype(np.float32))
+    config = TrainingConfig(dataset_id="test")
+    return state, scaler, config
+
+
+class TestPerFoldCheckpoints:
+    def test_save_creates_per_fold_files(self, manager, tmp_path):
+        fold_states, fold_scalers = _make_fold_data(n_folds=3)
+        state, scaler, config = _make_base_state()
+        config = TrainingConfig(dataset_id="test", k_folds=3)
+
+        cp_dir = manager.save(
+            task_id="t1", config=config,
+            model_state=state, val_loss=0.5,
+            scaler=scaler, progress=[],
+            fold_states=fold_states, fold_scalers=fold_scalers,
+        )
+
+        for i in range(3):
+            assert (cp_dir / f"model_fold{i}.pt").exists()
+            assert (cp_dir / f"scaler_fold{i}.json").exists()
+        # Backward-compat files still present
+        assert (cp_dir / "model.pt").exists()
+        assert (cp_dir / "scaler_params.json").exists()
+
+    def test_save_without_fold_data_still_works(self, manager, tmp_path):
+        state, scaler, config = _make_base_state()
+
+        cp_dir = manager.save(
+            task_id="t1", config=config,
+            model_state=state, val_loss=0.5,
+            scaler=scaler, progress=[],
+        )
+
+        assert (cp_dir / "model.pt").exists()
+        assert (cp_dir / "scaler_params.json").exists()
+        assert not (cp_dir / "model_fold0.pt").exists()
+
+    def test_save_fold_scaler_has_correct_values(self, manager, tmp_path):
+        fold_states, fold_scalers = _make_fold_data(n_folds=2)
+        state, scaler, config = _make_base_state()
+        config = TrainingConfig(dataset_id="test", k_folds=2)
+
+        cp_dir = manager.save(
+            task_id="t1", config=config,
+            model_state=state, val_loss=0.5,
+            scaler=scaler, progress=[],
+            fold_states=fold_states, fold_scalers=fold_scalers,
+        )
+
+        for i in range(2):
+            data = json.loads((cp_dir / f"scaler_fold{i}.json").read_text())
+            np.testing.assert_allclose(data["mean"], fold_scalers[i].mean_.tolist(), atol=1e-6)
+            np.testing.assert_allclose(data["scale"], fold_scalers[i].scale_.tolist(), atol=1e-6)

@@ -110,6 +110,8 @@ class TrainingService:
                 self._checkpoint_manager.save(
                     self._task_id, config, result.model_state,
                     result.best_loss, result.scaler, self._progress,
+                    fold_states=result.fold_states,
+                    fold_scalers=result.fold_scalers,
                 )
                 self._finish("completed")
             else:

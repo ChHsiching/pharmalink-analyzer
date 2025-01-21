@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from sklearn.model_selection import KFold
 
-from app.ml.checkpoint_loader import load_model, load_scaler_params
+from app.ml.checkpoint_loader import load_fold_model, load_model, load_scaler_params
 from app.models.training import TrainingConfig
 
 
@@ -38,21 +38,28 @@ def evaluate_all_folds(
     n_features: int,
     config: TrainingConfig,
 ) -> list[dict]:
-    mean, scale = load_scaler_params(checkpoint_dir / "scaler_params.json")
-    safe_scale = np.where(np.abs(scale) < 1e-8, 1.0, scale)
-    X_scaled = ((X - mean) / safe_scale).astype(np.float32)
-
     kfold = KFold(
         n_splits=config.k_folds,
         shuffle=config.k_fold_shuffle,
         random_state=config.k_fold_seed,
     )
 
-    model = load_model(checkpoint_dir, n_features, config)
-
     fold_results = []
     with torch.no_grad():
-        for fold_idx, (train_idx, val_idx) in enumerate(kfold.split(X_scaled)):
+        for fold_idx, (train_idx, val_idx) in enumerate(kfold.split(X)):
+            fold_model_path = checkpoint_dir / f"model_fold{fold_idx}.pt"
+            fold_scaler_path = checkpoint_dir / f"scaler_fold{fold_idx}.json"
+
+            if fold_model_path.exists() and fold_scaler_path.exists():
+                mean, scale = load_scaler_params(fold_scaler_path)
+                model = load_fold_model(checkpoint_dir, n_features, config, fold_idx)
+            else:
+                mean, scale = load_scaler_params(checkpoint_dir / "scaler_params.json")
+                model = load_model(checkpoint_dir, n_features, config)
+
+            safe_scale = np.where(np.abs(scale) < 1e-8, 1.0, scale)
+            X_scaled = ((X - mean) / safe_scale).astype(np.float32)
+
             X_val = torch.tensor(X_scaled[val_idx])
             y_val = y[val_idx]
             predictions, _ = model(X_val)

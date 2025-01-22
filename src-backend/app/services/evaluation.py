@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -22,14 +23,28 @@ from app.services.data_loader import data_loader as _default_data_loader
 
 
 class EvaluationService:
+    _CACHE_TTL = 300.0  # seconds
+
     def __init__(self, resolver: CheckpointResolver):
         self._resolver = resolver
+        self._cache: dict[str, tuple[float, tuple]] = {}
 
     def _evaluate(self, model_id: str):
+        now = time.time()
+        if model_id in self._cache:
+            ts, cached = self._cache[model_id]
+            if now - ts < self._CACHE_TTL:
+                return cached
+
         cp_dir, config = self._resolver.resolve(model_id)
         X, y, _ = self._resolver.get_features_with_target(config.dataset_id)
         n_features = X.shape[1]
-        return cp_dir, config, evaluate_all_folds(cp_dir, X, y, n_features, config)
+        result = (cp_dir, config, evaluate_all_folds(cp_dir, X, y, n_features, config))
+        self._cache[model_id] = (now, result)
+        return result
+
+    def invalidate(self, model_id: str) -> None:
+        self._cache.pop(model_id, None)
 
     def get_metrics(self, model_id: str) -> EvaluationMetricsResponse:
         _, _, fold_results = self._evaluate(model_id)

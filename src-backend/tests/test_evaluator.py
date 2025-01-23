@@ -249,3 +249,70 @@ class TestEvaluatePerFoldModels:
 
         results = evaluate_all_folds(cp_dir, X, y, n_features, config)
         assert len(results) == 3
+
+
+class TestValidateCheckpointDir:
+    def test_raises_on_missing_dir(self, tmp_path):
+        from app.ml.evaluator import validate_checkpoint_dir
+        from app.exceptions import CheckpointNotFoundError
+
+        with pytest.raises(CheckpointNotFoundError):
+            validate_checkpoint_dir(tmp_path / "nonexistent")
+
+    def test_raises_on_missing_config(self, tmp_path):
+        from app.ml.evaluator import validate_checkpoint_dir
+        from app.exceptions import DomainError
+
+        cp = tmp_path / "checkpoint"
+        cp.mkdir()
+        with pytest.raises(DomainError, match="config.json"):
+            validate_checkpoint_dir(cp)
+
+    def test_passes_on_valid_dir(self, tmp_path):
+        from app.ml.evaluator import validate_checkpoint_dir
+
+        cp = tmp_path / "checkpoint"
+        cp.mkdir()
+        (cp / "config.json").write_text("{}")
+        validate_checkpoint_dir(cp)
+
+
+class TestFoldErrorIsolation:
+    def test_skips_failed_folds(self, make_checkpoint):
+        """When some fold files are missing, remaining folds still return results."""
+        from app.ml.evaluator import evaluate_all_folds
+
+        env = make_checkpoint(k_folds=3, n_samples=30)
+        cp_dir = env["cp_dir"]
+
+        # Delete fold 1's per-fold model AND the global model
+        # Fold 0 and 2 have per-fold files → succeed
+        # Fold 1 has no per-fold model and no global fallback → fails
+        (cp_dir / "model_fold1.pt").unlink()
+        (cp_dir / "model.pt").unlink()
+
+        results = evaluate_all_folds(
+            cp_dir, env["X"], env["y"], env["n_features"], env["config"]
+        )
+        assert len(results) == 2
+        fold_nums = {r["fold"] for r in results}
+        assert 2 not in fold_nums  # fold 1 (0-indexed) was skipped
+
+    def test_raises_when_all_folds_fail(self, tmp_path):
+        """When all folds fail, raise DomainError."""
+        from app.ml.evaluator import evaluate_all_folds
+        from app.exceptions import DomainError
+        from app.models.training import TrainingConfig
+
+        cp_dir = tmp_path / "checkpoint"
+        cp_dir.mkdir()
+        (cp_dir / "config.json").write_text(
+            '{"dataset_id":"test","d_model":16,"n_heads":2,"n_layers":1,"dropout":0.0,"k_folds":2}'
+        )
+
+        X = np.zeros((20, 3), dtype=np.float32)
+        y = np.zeros(20, dtype=np.float32)
+        config = TrainingConfig(dataset_id="test", k_folds=2)
+
+        with pytest.raises(DomainError, match="All folds failed"):
+            evaluate_all_folds(cp_dir, X, y, 3, config)

@@ -1,5 +1,7 @@
 🌐 **Language / 语言:** [English](README.md) | [中文](README.zh-CN.md)
 
+<img src="./assets/logo.png" alt="PharmaLink Analyzer Logo" width="200" />
+
 <div align="center">
 
 # PharmaLink Analyzer
@@ -14,8 +16,6 @@
 [![Tauri 2](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=black)](https://tauri.app)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2+-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-<img src="./assets/logo.png" alt="PharmaLink Analyzer Logo" width="120" />
 
 </div>
 

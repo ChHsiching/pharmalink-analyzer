@@ -246,9 +246,20 @@ onUnmounted(() => {
 <style scoped>
 .training-config {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: minmax(280px, 360px) 1fr;
   height: calc(100vh - 48px);
   font-family: system-ui, sans-serif;
+}
+
+@media (max-width: 768px) {
+  .training-config {
+    grid-template-columns: 1fr;
+  }
+
+  .config-panel {
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+  }
 }
 
 .config-panel {

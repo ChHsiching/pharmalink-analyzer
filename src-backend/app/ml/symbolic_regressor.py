@@ -4,7 +4,6 @@ import numpy as np
 import sympy
 
 from app.exceptions import SymbolicRegressionError
-from app.ml.pysr_adapter import PySRResultAdapter
 
 
 def generate_interaction_features(
@@ -85,48 +84,56 @@ def _parse(tokens: list[str], pos: int, var_map: dict) -> tuple:
 
 
 def run_symbolic_regression(X, y, feature_names, niterations=20):
-    """Run PySR symbolic regression on the given data."""
+    """Run gplearn symbolic regression on the given data."""
     try:
-        from pysr import PySRRegressor
+        from gplearn.genetic import SymbolicRegressor
     except ImportError as e:
         raise SymbolicRegressionError(
-            "Julia backend not installed. "
-            "Install with: pip install pysr"
+            "gplearn not installed. Install with: pip install gplearn"
         ) from e
 
-    model = PySRRegressor(
-        model_selection="best",
-        niterations=niterations,
-        binary_operators=["+", "-", "*"],
-        unary_operators=["sin", "cos", "exp"],
-        maxsize=15,
-        populations=5,
-        population_size=15,
-        tournament_selection_n=10,
-        temp_equation_file=True,
-        progress=False,
-        verbosity=0,
+    model = SymbolicRegressor(
+        function_set=("add", "sub", "mul", "div"),
+        population_size=1000,
+        generations=60,
+        parsimony_coefficient=0.005,
+        tournament_size=20,
+        init_depth=(2, 6),
+        const_range=(-1.0, 1.0),
+        p_crossover=0.7,
+        p_subtree_mutation=0.1,
+        p_hoist_mutation=0.05,
+        p_point_mutation=0.1,
+        verbose=0,
+        random_state=42,
     )
 
     try:
-        model.fit(X, y, variable_names=feature_names)
-    except RuntimeError as e:
-        raise SymbolicRegressionError(
-            f"Symbolic regression failed to converge: {e}"
-        ) from e
+        model.fit(X, y)
     except Exception as e:
         raise SymbolicRegressionError(
-            f"Symbolic regression error: {e}"
+            f"Symbolic regression failed: {e}"
         ) from e
 
+    model._feature_names = feature_names
+    model._training_score = float(model.score(X, y))
     return model
 
 
 def extract_best_equation(model) -> dict:
-    """Extract the best equation from a fitted PySR model."""
-    return PySRResultAdapter(model).get_best_equation()
+    """Extract the best equation from a fitted gplearn model."""
+    program_str = str(model._program)
+    expr = parse_gplearn_program(program_str, model._feature_names)
+    return {
+        "sympy_expr": expr,
+        "latex": sympy.latex(expr),
+        "complexity": sympy.count_ops(expr),
+        "loss": 1.0 - model._training_score,
+    }
 
 
 def extract_pareto_equations(model) -> list[dict]:
-    """Extract all Pareto-front equations from a fitted PySR model."""
-    return PySRResultAdapter(model).get_pareto_equations()
+    """Extract Pareto-front equations. Returns single-element list (best only).
+    Full Pareto front via multi-run deferred to Issue #40."""
+    best = extract_best_equation(model)
+    return [{"index": 0, **best}]

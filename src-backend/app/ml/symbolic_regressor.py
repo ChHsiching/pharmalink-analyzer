@@ -83,7 +83,14 @@ def _parse(tokens: list[str], pos: int, var_map: dict) -> tuple:
         return sympy.Float(tok), pos + 1
 
 
-def run_symbolic_regression(X, y, feature_names, niterations=20):
+PRESET_CONFIG = {
+    "quick": {"population_size": 500, "generations": 30, "parsimony_coefficient": 0.01},
+    "standard": {"population_size": 1000, "generations": 60, "parsimony_coefficient": 0.005},
+    "thorough": {"population_size": 2000, "generations": 100, "parsimony_coefficient": 0.001},
+}
+
+
+def run_symbolic_regression(X, y, feature_names, preset="standard"):
     """Run gplearn symbolic regression on the given data."""
     try:
         from gplearn.genetic import SymbolicRegressor
@@ -92,11 +99,13 @@ def run_symbolic_regression(X, y, feature_names, niterations=20):
             "gplearn not installed. Install with: pip install gplearn"
         ) from e
 
+    preset_params = PRESET_CONFIG.get(preset, PRESET_CONFIG["standard"])
+
     model = SymbolicRegressor(
         function_set=("add", "sub", "mul", "div"),
-        population_size=1000,
-        generations=60,
-        parsimony_coefficient=0.005,
+        population_size=preset_params["population_size"],
+        generations=preset_params["generations"],
+        parsimony_coefficient=preset_params["parsimony_coefficient"],
         tournament_size=20,
         init_depth=(2, 6),
         const_range=(-1.0, 1.0),

@@ -11,7 +11,7 @@ dependencies = [
     "torch>=2.2",
     "scikit-learn>=1.4",
     "sympy>=1.12",
-    "pysr>=0.18",
+    "gplearn",
 ]
 
 [dependency-groups]

@@ -3,7 +3,7 @@
 These tests verify that data flows correctly across the analysis, evaluation,
 and expression API services. They exercise real service instances (not mock
 services) with a shared checkpoint and dataset, using monkeypatching only for
-the symbolic-regression backend (PySR/Julia).
+the symbolic-regression backend (gplearn).
 """
 
 import json
@@ -133,7 +133,7 @@ def e2e_env(tmp_path, make_checkpoint):
     analysis_svc = AnalysisService(resolver=resolver)
     evaluation_svc = EvaluationService(resolver=resolver)
 
-    # ExpressionService uses a mock pipeline to avoid PySR/Julia dependency.
+    # ExpressionService uses a mock pipeline to avoid gplearn runtime cost.
     expression_svc = ExpressionService(resolver=resolver, pipeline=_mock_pipeline())
 
     app.dependency_overrides[get_analysis_service] = lambda: analysis_svc
@@ -302,7 +302,7 @@ async def test_loss_curve_has_history(e2e_env):
 
 
 # ===========================================================================
-# Expression chain tests (4) — uses monkeypatch for symbolic regression
+# Expression chain tests (4) — uses mock pipeline for symbolic regression
 # ===========================================================================
 
 @pytest.mark.asyncio

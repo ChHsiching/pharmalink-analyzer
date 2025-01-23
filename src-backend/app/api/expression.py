@@ -10,9 +10,10 @@ router = APIRouter(prefix="/expressions", tags=["expressions"])
 async def generate_expression(
     model_id: str,
     top_k: int = Query(10, ge=1, le=100),
+    preset: str = Query("standard", pattern="^(quick|standard|thorough)$"),
     service: ExpressionService = Depends(get_expression_service),
 ):
-    return service.start_generate(model_id, top_k)
+    return service.start_generate(model_id, top_k, preset=preset)
 
 
 @router.get("/result/{task_id}")

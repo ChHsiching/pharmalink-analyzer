@@ -81,7 +81,7 @@ class TestGenerate:
         assert result.latex == "A^{2} + 1"
         assert result.complexity == 3
         assert result.r2_score == 0.95
-        mock_pipeline.run.assert_called_once_with("model-abc", 10)
+        mock_pipeline.run.assert_called_once_with("model-abc", 10, preset="standard")
 
     def test_generate_propagates_pipeline_error(self, service, mock_pipeline):
         mock_pipeline.run.side_effect = SymbolicRegressionError("Julia backend not installed")

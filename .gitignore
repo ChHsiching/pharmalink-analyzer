@@ -10,6 +10,9 @@ __pycache__/
 dist/
 src-frontend/dist/
 
+# Checkpoints (model artifacts, too large for git)
+checkpoints/
+
 # Tauri
 src-tauri/target/
 

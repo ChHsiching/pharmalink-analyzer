@@ -56,8 +56,8 @@ def _mock_pareto_equations():
     ]
 
 
-def _mock_pysr_model():
-    """Return a mock PySR model object with .score()."""
+def _mock_gplearn_model():
+    """Return a mock gplearn model object with .score()."""
     model = MagicMock()
     model.score.return_value = 0.85
     return model

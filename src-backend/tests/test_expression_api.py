@@ -202,7 +202,7 @@ async def test_tree_not_found(mock_service):
 
 
 @pytest.mark.asyncio
-async def test_generate_pysr_error_returns_503():
+async def test_generate_gplearn_error_returns_503():
     """SymbolicRegressionError should return 503, not unhandled 500."""
     class MockFailingService:
         def start_generate(self, model_id, top_k=10):

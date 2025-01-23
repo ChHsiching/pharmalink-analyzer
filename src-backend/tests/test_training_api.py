@@ -64,14 +64,15 @@ async def test_start_training_success(client):
     assert "task_id" in data
     assert data["status"] == "started"
 
+    final_status = None
     for _ in range(40):
         await asyncio.sleep(0.5)
         status_resp = await client.get("/api/v1/models/train/status")
-        if status_resp.json()["status"] != "running":
+        final_status = status_resp.json()["status"]
+        if final_status != "running":
             break
 
-    training_svc = app.dependency_overrides[get_training_service]()
-    training_svc.request_stop()
+    assert final_status == "completed", f"Training did not complete: {final_status}"
 
 
 @pytest.mark.asyncio

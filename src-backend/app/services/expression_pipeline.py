@@ -47,7 +47,7 @@ class ExpressionPipeline:
     def __init__(self, resolver: CheckpointResolver) -> None:
         self._resolver = resolver
 
-    def run(self, model_id: str, top_k: int = 10) -> PipelineResult:
+    def run(self, model_id: str, top_k: int = 10, preset: str = "standard") -> PipelineResult:
         """Run the full expression discovery pipeline.
 
         Steps 1–5: resolve checkpoint, load features, extract attention,
@@ -78,7 +78,7 @@ class ExpressionPipeline:
         X_train, X_test, y_train, y_test = train_test_split(
             X_aug, y, test_size=0.2, random_state=42,
         )
-        model = run_symbolic_regression(X_train, y_train, aug_names)
+        model = run_symbolic_regression(X_train, y_train, aug_names, preset=preset)
 
         # Steps 7–9: any Exception → SymbolicRegressionError
         try:

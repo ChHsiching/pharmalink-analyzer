@@ -44,8 +44,8 @@ class ExpressionService:
             tree=sympy_to_tree(state.current_sympy),
         )
 
-    def generate(self, model_id: str, top_k: int = 10) -> ExpressionResponse:
-        result = self._pipeline.run(model_id, top_k)
+    def generate(self, model_id: str, top_k: int = 10, preset: str = "standard") -> ExpressionResponse:
+        result = self._pipeline.run(model_id, top_k, preset=preset)
 
         expr_id = f"expr_{uuid.uuid4().hex[:8]}"
         state = ExpressionState(
@@ -61,7 +61,7 @@ class ExpressionService:
         self._state.put(state)
         return self._to_response(state)
 
-    def start_generate(self, model_id: str, top_k: int = 10) -> TaskStatusResponse:
+    def start_generate(self, model_id: str, top_k: int = 10, preset: str = "standard") -> TaskStatusResponse:
         """Start async expression generation, returning a task_id immediately."""
         task_id = f"task_{uuid.uuid4().hex[:8]}"
         with self._tasks_lock:
@@ -74,7 +74,7 @@ class ExpressionService:
 
         thread = threading.Thread(
             target=self._run_generate,
-            args=(task_id, model_id, top_k),
+            args=(task_id, model_id, top_k, preset),
             daemon=True,
         )
         thread.start()
@@ -93,12 +93,12 @@ class ExpressionService:
             error=task["error"],
         )
 
-    def _run_generate(self, task_id: str, model_id: str, top_k: int):
+    def _run_generate(self, task_id: str, model_id: str, top_k: int, preset: str):
         """Background thread: run the generate pipeline and update task status."""
         with self._tasks_lock:
             self._tasks[task_id]["status"] = "running"
         try:
-            response = self.generate(model_id, top_k)
+            response = self.generate(model_id, top_k, preset=preset)
             result_dict = response.model_dump()
             with self._tasks_lock:
                 self._tasks[task_id]["status"] = "completed"

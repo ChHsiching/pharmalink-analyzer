@@ -13,7 +13,7 @@ from app.models.expression import (
 
 
 class MockExpressionService:
-    def start_generate(self, model_id, top_k=10):
+    def start_generate(self, model_id, top_k=10, preset="standard"):
         from app.models.expression import TaskStatusResponse
         return TaskStatusResponse(task_id="task_test1", status="pending")
 
@@ -144,6 +144,24 @@ async def test_generate_expression(mock_service):
 
 
 @pytest.mark.asyncio
+async def test_generate_with_valid_preset(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/expressions/generate/model1?preset=quick",
+        )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_generate_with_invalid_preset_returns_422(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/expressions/generate/model1?preset=invalid",
+        )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_simplify_expression(mock_service):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post("/api/v1/expressions/simplify/expr_test1")
@@ -205,7 +223,7 @@ async def test_tree_not_found(mock_service):
 async def test_generate_gplearn_error_returns_503():
     """SymbolicRegressionError should return 503, not unhandled 500."""
     class MockFailingService:
-        def start_generate(self, model_id, top_k=10):
+        def start_generate(self, model_id, top_k=10, preset="standard"):
             raise SymbolicRegressionError("Julia backend not installed")
 
     app.dependency_overrides[get_expression_service] = lambda: MockFailingService()

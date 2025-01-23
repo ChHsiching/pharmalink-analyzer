@@ -7,6 +7,7 @@ import sympy
 from unittest.mock import MagicMock, patch
 
 from app.ml.symbolic_regressor import (
+    PRESET_CONFIG,
     generate_interaction_features,
     run_symbolic_regression,
     extract_best_equation,
@@ -144,3 +145,58 @@ def test_pareto_matches_best():
     pareto = extract_pareto_equations(model)
     assert pareto[0]["sympy_expr"] == best["sympy_expr"]
     assert pareto[0]["complexity"] == best["complexity"]
+
+
+# ---------------------------------------------------------------------------
+# Preset config tests
+# ---------------------------------------------------------------------------
+
+
+def test_preset_config_has_three_presets():
+    assert set(PRESET_CONFIG.keys()) == {"quick", "standard", "thorough"}
+
+
+def test_quick_preset_params():
+    cfg = PRESET_CONFIG["quick"]
+    assert cfg["population_size"] == 500
+    assert cfg["generations"] == 30
+    assert cfg["parsimony_coefficient"] == 0.01
+
+
+def test_standard_preset_params():
+    cfg = PRESET_CONFIG["standard"]
+    assert cfg["population_size"] == 1000
+    assert cfg["generations"] == 60
+    assert cfg["parsimony_coefficient"] == 0.005
+
+
+def test_thorough_preset_params():
+    cfg = PRESET_CONFIG["thorough"]
+    assert cfg["population_size"] == 2000
+    assert cfg["generations"] == 100
+    assert cfg["parsimony_coefficient"] == 0.001
+
+
+def test_preset_overrides_regressor_params():
+    """Quick preset should pass different population_size to gplearn."""
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_model = _make_mock_model("add(X0, X1)", ["a", "b"])
+    with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
+        run_symbolic_regression(X, y, ["a", "b"], preset="quick")
+        call_kwargs = MockSR.call_args[1]
+        assert call_kwargs["population_size"] == 500
+        assert call_kwargs["generations"] == 30
+        assert call_kwargs["parsimony_coefficient"] == 0.01
+
+
+def test_invalid_preset_defaults_to_standard():
+    """Invalid preset name should fall back to standard config."""
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_model = _make_mock_model("add(X0, X1)", ["a", "b"])
+    with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
+        run_symbolic_regression(X, y, ["a", "b"], preset="nonexistent")
+        call_kwargs = MockSR.call_args[1]
+        assert call_kwargs["population_size"] == 1000
+        assert call_kwargs["generations"] == 60

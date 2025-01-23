@@ -22,7 +22,7 @@ export function useExpression() {
     }
   }
 
-  async function generateExpression(checkpointId: string, topK = 10) {
+  async function generateExpression(checkpointId: string, topK = 10, preset = "standard") {
     stopPolling();
     loading.value = true;
     error.value = "";
@@ -31,7 +31,7 @@ export function useExpression() {
       const startResp = await apiClient.post<TaskStatusResponse>(
         `/expressions/generate/${checkpointId}`,
         null,
-        { params: { top_k: topK }, timeout: 30000 },
+        { params: { top_k: topK, preset }, timeout: 30000 },
       );
       const taskId = startResp.data.task_id;
 

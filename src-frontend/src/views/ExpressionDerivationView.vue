@@ -8,6 +8,11 @@
           {{ cp.id }} (loss: {{ cp.final_loss.toFixed(4) }})
         </option>
       </select>
+      <select v-model="selectedPreset" class="preset-select">
+        <option value="quick">快速 (~1 min)</option>
+        <option value="standard">标准 (~2-5 min)</option>
+        <option value="thorough">深度 (~5-15 min)</option>
+      </select>
       <button @click="generate" :disabled="!selectedCheckpoint || loading" class="btn-generate">
         生成表达式
       </button>
@@ -18,7 +23,7 @@
         <button @click="redo" :disabled="loading || !canRedo" class="btn-action">重做</button>
       </template>
     </div>
-    <div v-if="loading" class="loading">计算中...</div>
+    <div v-if="loading" class="loading">符号回归可能需要数分钟，请耐心等待...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-if="expression">
       <div class="metrics">
@@ -49,6 +54,7 @@ import { useExpression } from "@/composables/useExpression";
 import TreeNode from "./TreeNode.vue";
 
 const selectedCheckpoint = ref("");
+const selectedPreset = ref("standard");
 const katexRef = ref<HTMLElement>();
 
 const { checkpoints, fetchCheckpoints } = useTraining();
@@ -64,7 +70,7 @@ const canRedo = computed(() => history.value ? history.value.current_index < his
 
 async function generate() {
   if (!selectedCheckpoint.value) return;
-  await generateExpression(selectedCheckpoint.value);
+  await generateExpression(selectedCheckpoint.value, 10, selectedPreset.value);
   if (expression.value) await fetchHistory(expression.value.expr_id);
 }
 async function simplify() {
@@ -118,6 +124,11 @@ h2 { color: #2e7d32; }
   flex-wrap: wrap;
 }
 .checkpoint-select {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.preset-select {
   padding: 6px 12px;
   border: 1px solid #ccc;
   border-radius: 4px;

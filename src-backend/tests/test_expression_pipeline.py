@@ -118,7 +118,7 @@ def _fake_pareto():
 
 
 def _fake_model():
-    """Return a mock PySR model with .score() returning R2."""
+    """Return a mock gplearn model with .score() returning R2."""
     model = MagicMock()
     model.score.return_value = 0.95
     return model

@@ -25,7 +25,7 @@
         <button @click="redo" :disabled="loading || !canRedo" class="btn-action">重做</button>
       </template>
     </div>
-    <div v-if="loading" class="loading">符号回归可能需要数分钟，请耐心等待...</div>
+    <div v-if="loading" class="loading">{{ loadingMessage }}</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-if="expression">
       <div class="metrics">
@@ -69,6 +69,7 @@ const {
 
 const canUndo = computed(() => history.value ? history.value.current_index > 0 : false);
 const canRedo = computed(() => history.value ? history.value.current_index < history.value.history.length - 1 : false);
+const loadingMessage = computed(() => expression.value ? "处理中..." : "符号回归可能需要数分钟，请耐心等待...");
 
 async function generate() {
   if (!selectedCheckpoint.value) return;
@@ -77,23 +78,23 @@ async function generate() {
 }
 async function simplify() {
   if (!expression.value) return;
-  await simplifyExpression(expression.value.expr_id);
-  if (expression.value) await fetchHistory(expression.value.expr_id);
+  const ok = await simplifyExpression(expression.value.expr_id);
+  if (ok && expression.value) await fetchHistory(expression.value.expr_id);
 }
 async function optimize() {
   if (!expression.value) return;
-  await optimizeExpression(expression.value.expr_id);
-  if (expression.value) await fetchHistory(expression.value.expr_id);
+  const ok = await optimizeExpression(expression.value.expr_id);
+  if (ok && expression.value) await fetchHistory(expression.value.expr_id);
 }
 async function undo() {
   if (!expression.value) return;
-  await undoExpression(expression.value.expr_id, 1);
-  if (expression.value) await fetchHistory(expression.value.expr_id);
+  const ok = await undoExpression(expression.value.expr_id, 1);
+  if (ok && expression.value) await fetchHistory(expression.value.expr_id);
 }
 async function redo() {
   if (!expression.value) return;
-  await undoExpression(expression.value.expr_id, -1);
-  if (expression.value) await fetchHistory(expression.value.expr_id);
+  const ok = await undoExpression(expression.value.expr_id, -1);
+  if (ok && expression.value) await fetchHistory(expression.value.expr_id);
 }
 
 function renderLatex() {

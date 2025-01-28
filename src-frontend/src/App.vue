@@ -17,37 +17,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { onMounted } from "vue";
 import { RouterView } from "vue-router";
 import TabBar from "@/components/TabBar.vue";
 import { useWorkflow } from "@/composables/useWorkflow";
-import { useApi } from "@/composables/useApi";
+import { useBackendReady } from "@/composables/useBackendReady";
 
 const { init } = useWorkflow();
-const { checkHealth } = useApi();
-
-const ready = ref(false);
-const loadingError = ref("");
+const { ready, error: loadingError, startPolling } = useBackendReady({
+  intervalMs: 500,
+  maxAttempts: 60,
+});
 
 onMounted(async () => {
-  try {
-    const maxAttempts = 60;
-    for (let i = 0; i < maxAttempts; i++) {
-      try {
-        await checkHealth();
-        ready.value = true;
-        break;
-      } catch {
-        await new Promise((r) => setTimeout(r, 500));
-      }
-    }
-    if (!ready.value) {
-      loadingError.value = "无法连接到后端服务，请重新启动应用";
-      return;
-    }
+  await startPolling();
+  if (ready.value) {
     await init();
-  } catch (e) {
-    loadingError.value = String(e);
   }
 });
 </script>

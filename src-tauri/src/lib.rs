@@ -24,9 +24,8 @@ fn spawn_backend_sidecar(app: tauri::AppHandle) -> Result<(), Box<dyn std::error
 
     let (mut rx, child) = sidecar_command.spawn()?;
 
-    app.manage(BackendChild(child));
+    app.manage(BackendChild(Some(child)));
 
-    let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             if let CommandEvent::Stdout(line_bytes) = event {
@@ -43,11 +42,13 @@ fn spawn_backend_sidecar(app: tauri::AppHandle) -> Result<(), Box<dyn std::error
 }
 
 #[cfg(not(debug_assertions))]
-struct BackendChild(tauri_plugin_shell::process::CommandChild);
+struct BackendChild(Option<tauri_plugin_shell::process::CommandChild>);
 
 #[cfg(not(debug_assertions))]
 impl Drop for BackendChild {
     fn drop(&mut self) {
-        let _ = self.0.kill();
+        if let Some(child) = self.0.take() {
+            let _ = child.kill();
+        }
     }
 }

@@ -32,3 +32,7 @@ Thumbs.db
 
 # Custom (Modification Prohibited)
 docs/
+# PyInstaller build artifacts
+src-backend/build/
+src-backend/dist/
+src-tauri/binaries/

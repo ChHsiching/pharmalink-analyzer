@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.config import CORS_ORIGINS, API_PREFIX
+from app.config import CORS_ORIGINS, API_PREFIX, DATA_DIR
 from app.api.analysis import router as analysis_router
 from app.api.datasets import router as datasets_router
 from app.api.evaluation import router as evaluation_router
@@ -27,7 +27,6 @@ from app.services.data_loader import data_loader
 from app.dependencies import get_training_service
 
 logger = logging.getLogger(__name__)
-DATA_DIR: Path = Path(__file__).parent.parent.parent / "docs" / "csv_data"
 
 
 @asynccontextmanager

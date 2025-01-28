@@ -7,8 +7,10 @@
     "dev:backend": "cd src-backend && uv run uvicorn app.main:app --port 8765 --reload",
     "dev:frontend": "cd src-frontend && npx vite",
     "build:frontend": "cd src-frontend && npx vue-tsc --noEmit && npx vite build",
+    "build:backend": "bash scripts/build-backend.sh",
     "tauri:dev": "WEBKIT_DISABLE_DMABUF_RENDERER=1 cargo tauri dev",
-    "tauri:build": "cargo tauri build",
+    "tauri:build": "npm run build:backend && cargo tauri build",
+    "test:tauri": "bash tests/test-tauri-gui.sh",
     "start": "bash scripts/start.sh"
   },
   "devDependencies": {

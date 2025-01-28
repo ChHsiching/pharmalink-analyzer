@@ -36,3 +36,15 @@ _training_service = TrainingService()
 
 def get_training_service() -> TrainingService:
     return _training_service
+
+
+from app.services.formulation import FormulationService
+
+_formulation_service = FormulationService(
+    state_manager=_expression_service._state,
+    resolver=_expression_service._resolver,
+)
+
+
+def get_formulation_service() -> FormulationService:
+    return _formulation_service

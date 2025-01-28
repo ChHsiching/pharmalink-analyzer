@@ -146,3 +146,66 @@ def extract_pareto_equations(model) -> list[dict]:
     Full Pareto front via multi-run deferred to Issue #40."""
     best = extract_best_equation(model)
     return [{"index": 0, **best}]
+
+
+PARSIMONY_COEFFICIENTS = [0.0, 0.005, 0.02]
+
+
+def run_pareto_regression(X, y, feature_names, preset="standard"):
+    """Run 3 gplearn symbolic regressions with different parsimony coefficients.
+
+    Uses ThreadPoolExecutor to run all 3 fits in parallel. Returns list of
+    fitted models sorted by equation complexity (ascending).
+    """
+    try:
+        from gplearn.genetic import SymbolicRegressor
+    except ImportError as e:
+        raise SymbolicRegressionError(
+            "gplearn not installed. Install with: pip install gplearn"
+        ) from e
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    preset_params = PRESET_CONFIG.get(preset, PRESET_CONFIG["standard"])
+
+    def _fit_single(parsimony_coefficient):
+        model = SymbolicRegressor(
+            function_set=("add", "sub", "mul", "div"),
+            population_size=preset_params["population_size"],
+            generations=preset_params["generations"],
+            parsimony_coefficient=parsimony_coefficient,
+            tournament_size=20,
+            init_depth=(2, 6),
+            const_range=(-1.0, 1.0),
+            p_crossover=0.7,
+            p_subtree_mutation=0.1,
+            p_hoist_mutation=0.05,
+            p_point_mutation=0.1,
+            verbose=0,
+            random_state=42,
+        )
+        try:
+            model.fit(X, y)
+        except Exception as e:
+            raise SymbolicRegressionError(
+                f"Symbolic regression failed: {e}"
+            ) from e
+        model._feature_names = feature_names
+        model._training_score = float(model.score(X, y))
+        return model
+
+    try:
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [
+                executor.submit(_fit_single, pc) for pc in PARSIMONY_COEFFICIENTS
+            ]
+            models = [f.result() for f in futures]
+    except SymbolicRegressionError:
+        raise
+    except Exception as e:
+        raise SymbolicRegressionError(
+            f"Pareto regression failed: {e}"
+        ) from e
+
+    models.sort(key=lambda m: extract_best_equation(m)["complexity"])
+    return models

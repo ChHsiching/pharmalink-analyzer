@@ -200,3 +200,88 @@ def test_invalid_preset_defaults_to_standard():
         call_kwargs = MockSR.call_args[1]
         assert call_kwargs["population_size"] == 1000
         assert call_kwargs["generations"] == 60
+
+
+# ---------------------------------------------------------------------------
+# Pareto regression tests
+# ---------------------------------------------------------------------------
+
+
+def test_parsimony_coefficients_has_three_values():
+    """PARSIMONY_COEFFICIENTS should contain exactly three float values."""
+    from app.ml.symbolic_regressor import PARSIMONY_COEFFICIENTS
+    assert len(PARSIMONY_COEFFICIENTS) == 3
+    assert all(isinstance(c, (int, float)) for c in PARSIMONY_COEFFICIENTS)
+
+
+def test_pareto_regression_returns_three_models():
+    """run_pareto_regression should return a list of 3 fitted models."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_models = [
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(mul(X0, X1), X0)", ["a", "b"]),
+        _make_mock_model("add(add(X0, X1), mul(X0, X1))", ["a", "b"]),
+    ]
+    with patch("gplearn.genetic.SymbolicRegressor") as MockSR:
+        MockSR.side_effect = mock_models
+        results = run_pareto_regression(X, y, ["a", "b"])
+    assert len(results) == 3
+
+
+def test_pareto_regression_uses_different_parsimony():
+    """Each of the 3 runs should receive a different parsimony_coefficient."""
+    from app.ml.symbolic_regressor import run_pareto_regression, PARSIMONY_COEFFICIENTS
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_models = [
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+    ]
+    with patch("gplearn.genetic.SymbolicRegressor") as MockSR:
+        MockSR.side_effect = mock_models
+        run_pareto_regression(X, y, ["a", "b"])
+    actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
+    assert sorted(actual_parsimonies) == sorted(PARSIMONY_COEFFICIENTS)
+
+
+def test_pareto_regression_gplearn_missing():
+    """Should raise SymbolicRegressionError when gplearn is not installed."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    with patch.dict(sys.modules, {"gplearn": None, "gplearn.genetic": None}):
+        with pytest.raises(SymbolicRegressionError, match="gplearn"):
+            run_pareto_regression(X, y, ["a", "b"])
+
+
+def test_pareto_regression_fit_failure():
+    """Should raise SymbolicRegressionError when fitting fails."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_model = MagicMock()
+    mock_model.fit.side_effect = ValueError("Bad data shape")
+    with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model):
+        with pytest.raises(SymbolicRegressionError, match="failed"):
+            run_pareto_regression(X, y, ["a", "b"])
+
+
+def test_pareto_regression_forwards_preset():
+    """Preset should be forwarded to each regressor run."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_models = [
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+    ]
+    with patch("gplearn.genetic.SymbolicRegressor") as MockSR:
+        MockSR.side_effect = mock_models
+        run_pareto_regression(X, y, ["a", "b"], preset="quick")
+        call_kwargs = MockSR.call_args_list[0][1]
+        assert call_kwargs["population_size"] == 500
+        assert call_kwargs["generations"] == 30

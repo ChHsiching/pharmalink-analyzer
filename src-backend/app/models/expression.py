@@ -16,6 +16,8 @@ class ExpressionResponse(BaseModel):
     complexity: int
     r2_score: float
     tree: ExpressionNode
+    pareto_count: int = 1
+    pareto_index: int = 0
 
 
 class ExpressionHistoryEntry(BaseModel):

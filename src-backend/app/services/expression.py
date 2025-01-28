@@ -35,6 +35,11 @@ class ExpressionService:
         self._tasks_lock = threading.Lock()
 
     def _to_response(self, state: ExpressionState) -> ExpressionResponse:
+        pareto_index = next(
+            (i for i, eq in enumerate(state.pareto_equations)
+             if eq["complexity"] == state.current_complexity),
+            0,
+        )
         return ExpressionResponse(
             expr_id=state.expr_id,
             model_id=state.model_id,
@@ -42,6 +47,8 @@ class ExpressionService:
             complexity=state.current_complexity,
             r2_score=state.current_r2,
             tree=sympy_to_tree(state.current_sympy),
+            pareto_count=len(state.pareto_equations),
+            pareto_index=pareto_index,
         )
 
     def generate(self, model_id: str, top_k: int = 10, preset: str = "standard") -> ExpressionResponse:
@@ -149,6 +156,7 @@ class ExpressionService:
         state.current_sympy = chosen["sympy_expr"]
         state.current_latex = chosen["latex"]
         state.current_complexity = chosen["complexity"]
+        state.current_r2 = chosen["r2_score"]
         self._state.push_history(state, "optimize")
         return self._to_response(state)
 

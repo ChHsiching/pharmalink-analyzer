@@ -21,20 +21,22 @@ def _fake_pareto():
     a = sympy.Symbol("A")
     b = sympy.Symbol("B")
     return [
-        {"index": 0, "latex": "A + B", "complexity": 3, "loss": 0.05, "sympy_expr": a + b},
-        {"index": 1, "latex": "A^{2} + 1", "complexity": 5, "loss": 0.01, "sympy_expr": a ** 2 + 1},
-        {"index": 2, "latex": "A^{2} + B^{2} + 1", "complexity": 7, "loss": 0.005, "sympy_expr": a ** 2 + b ** 2 + 1},
+        {"index": 0, "latex": "A + B", "complexity": 3, "loss": 0.05, "r2_score": 0.80, "sympy_expr": a + b},
+        {"index": 1, "latex": "A^{2} + 1", "complexity": 5, "loss": 0.01, "r2_score": 0.90, "sympy_expr": a ** 2 + 1},
+        {"index": 2, "latex": "A^{2} + B^{2} + 1", "complexity": 7, "loss": 0.005, "r2_score": 0.95, "sympy_expr": a ** 2 + b ** 2 + 1},
     ]
 
 
 def _fake_pipeline_result(**overrides):
+    pareto = _fake_pareto()
+    best = pareto[-1]  # most complex
     defaults = {
-        "sympy_expr": sympy.Symbol("A") ** 2 + 1,
-        "latex": "A^{2} + 1",
-        "complexity": 3,
-        "loss": 0.01,
-        "r2_score": 0.95,
-        "pareto_equations": _fake_pareto(),
+        "sympy_expr": best["sympy_expr"],
+        "latex": best["latex"],
+        "complexity": best["complexity"],
+        "loss": best["loss"],
+        "r2_score": best["r2_score"],
+        "pareto_equations": pareto,
     }
     defaults.update(overrides)
     return PipelineResult(**defaults)
@@ -78,9 +80,11 @@ class TestGenerate:
         assert isinstance(result, ExpressionResponse)
         assert result.model_id == "model-abc"
         assert result.expr_id.startswith("expr_")
-        assert result.latex == "A^{2} + 1"
-        assert result.complexity == 3
+        assert result.latex == "A^{2} + B^{2} + 1"
+        assert result.complexity == 7
         assert result.r2_score == 0.95
+        assert result.pareto_count == 3
+        assert result.pareto_index == 2
         mock_pipeline.run.assert_called_once_with("model-abc", 10, preset="standard")
 
     def test_generate_propagates_pipeline_error(self, service, mock_pipeline):
@@ -140,6 +144,36 @@ class TestOptimize:
         expr_id = result.expr_id
         optimized = service.optimize(expr_id)
         assert optimized.complexity == result.complexity
+
+    def test_optimize_updates_r2_score(self, mock_pipeline):
+        a = sympy.Symbol("A")
+        b = sympy.Symbol("B")
+        mock_pipeline.run.return_value = _fake_pipeline_result(
+            sympy_expr=a ** 2 + b ** 2 + 1,
+            latex="A^{2} + B^{2} + 1",
+            complexity=7,
+        )
+        service = ExpressionService(resolver=MagicMock(), pipeline=mock_pipeline)
+        result = service.generate("model-abc")
+        assert result.r2_score == 0.95
+        optimized = service.optimize(result.expr_id)
+        assert optimized.r2_score == 0.90
+        assert optimized.pareto_count == 3
+        assert optimized.pareto_index == 1
+
+    def test_optimize_at_lowest_shows_index_zero(self, mock_pipeline):
+        a = sympy.Symbol("A")
+        b = sympy.Symbol("B")
+        mock_pipeline.run.return_value = _fake_pipeline_result(
+            sympy_expr=a + b,
+            latex="A + B",
+            complexity=3,
+        )
+        service = ExpressionService(resolver=MagicMock(), pipeline=mock_pipeline)
+        result = service.generate("model-abc")
+        at_best = service.optimize(result.expr_id)
+        assert at_best.pareto_index == 0
+        assert at_best.pareto_count == 3
 
 
 class TestGetTree:
@@ -205,7 +239,7 @@ class TestAsyncGenerate:
         result = service.get_task_result(task.task_id)
         assert result.status == "completed"
         assert result.result is not None
-        assert result.result["latex"] == "A^{2} + 1"
+        assert result.result["latex"] == "A^{2} + B^{2} + 1"
 
     def test_get_task_result_failed(self, mock_pipeline):
         mock_pipeline.run.side_effect = RuntimeError("Julia crashed")

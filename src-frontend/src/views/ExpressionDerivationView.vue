@@ -18,7 +18,9 @@
       </button>
       <template v-if="expression">
         <button @click="simplify" :disabled="loading" class="btn-action">精简</button>
-        <button @click="optimize" :disabled="loading" class="btn-action">优化</button>
+        <button @click="optimize" :disabled="loading" class="btn-action">
+          优化<template v-if="expression?.pareto_count"> ({{ expression.pareto_index + 1 }}/{{ expression.pareto_count }})</template>
+        </button>
         <button @click="undo" :disabled="loading || !canUndo" class="btn-action">撤销</button>
         <button @click="redo" :disabled="loading || !canRedo" class="btn-action">重做</button>
       </template>

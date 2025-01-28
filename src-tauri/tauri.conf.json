@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "PharmaLink Analyzer — 中药成分关联性分析",
+        "title": "PharmaLink Analyzer \u2014 \u4e2d\u836f\u6210\u5206\u5173\u8054\u6027\u5206\u6790",
         "width": 1280,
         "height": 800,
         "resizable": true,
@@ -33,6 +33,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/pharmalink-backend"
     ]
   }
 }

@@ -36,3 +36,6 @@ docs/
 src-backend/build/
 src-backend/dist/
 src-tauri/binaries/
+
+# Webdriver test deps
+tests/webdriver/node_modules/

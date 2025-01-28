@@ -10,6 +10,7 @@
     "build:backend": "bash scripts/build-backend.sh",
     "tauri:dev": "WEBKIT_DISABLE_DMABUF_RENDERER=1 cargo tauri dev",
     "tauri:build": "npm run build:backend && cargo tauri build",
+    "test:tauri": "cd tests/webdriver && npm test",
     "start": "bash scripts/start.sh"
   },
   "devDependencies": {

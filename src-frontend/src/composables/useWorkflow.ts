@@ -8,7 +8,8 @@ export type TabName =
   | "training"
   | "analysis"
   | "expression"
-  | "evaluation";
+  | "evaluation"
+  | "formulation";
 
 export const TAB_ORDER: TabName[] = [
   "data-import",
@@ -16,6 +17,7 @@ export const TAB_ORDER: TabName[] = [
   "analysis",
   "expression",
   "evaluation",
+  "formulation",
 ];
 
 export const TAB_LABELS: Record<TabName, string> = {
@@ -24,11 +26,13 @@ export const TAB_LABELS: Record<TabName, string> = {
   analysis: "注意力分析",
   expression: "表达式推导",
   evaluation: "模型评估",
+  formulation: "最优配比",
 };
 
 const state = reactive({
   datasetsAvailable: false,
   hasCheckpoint: false,
+  currentExprId: "",
 });
 
 export function useWorkflow() {
@@ -38,6 +42,7 @@ export function useWorkflow() {
     analysis: state.hasCheckpoint,
     expression: state.hasCheckpoint,
     evaluation: state.hasCheckpoint,
+    formulation: state.currentExprId !== "",
   }));
 
   function markDatasetsAvailable() {
@@ -46,6 +51,10 @@ export function useWorkflow() {
 
   function markHasCheckpoint() {
     state.hasCheckpoint = true;
+  }
+
+  function markCurrentExpression(exprId: string) {
+    state.currentExprId = exprId;
   }
 
   async function init() {
@@ -72,6 +81,7 @@ export function useWorkflow() {
     tabEnabled,
     markDatasetsAvailable,
     markHasCheckpoint,
+    markCurrentExpression,
     init,
   };
 }

@@ -53,6 +53,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import katex from "katex";
 import { useTraining } from "@/composables/useTraining";
 import { useExpression } from "@/composables/useExpression";
+import { useWorkflow } from "@/composables/useWorkflow";
 import TreeNode from "./TreeNode.vue";
 
 const selectedCheckpoint = ref("");
@@ -60,6 +61,7 @@ const selectedPreset = ref("standard");
 const katexRef = ref<HTMLElement>();
 
 const { checkpoints, fetchCheckpoints } = useTraining();
+const { markCurrentExpression } = useWorkflow();
 const {
   expression, history, loading, error,
   generateExpression, simplifyExpression, optimizeExpression,
@@ -74,27 +76,42 @@ const loadingMessage = computed(() => expression.value ? "处理中..." : "符�
 async function generate() {
   if (!selectedCheckpoint.value) return;
   await generateExpression(selectedCheckpoint.value, 10, selectedPreset.value);
-  if (expression.value) await fetchHistory(expression.value.expr_id);
+  if (expression.value) {
+    await fetchHistory(expression.value.expr_id);
+    markCurrentExpression(expression.value.expr_id);
+  }
 }
 async function simplify() {
   if (!expression.value) return;
   const ok = await simplifyExpression(expression.value.expr_id);
-  if (ok && expression.value) await fetchHistory(expression.value.expr_id);
+  if (ok && expression.value) {
+    await fetchHistory(expression.value.expr_id);
+    markCurrentExpression(expression.value.expr_id);
+  }
 }
 async function optimize() {
   if (!expression.value) return;
   const ok = await optimizeExpression(expression.value.expr_id);
-  if (ok && expression.value) await fetchHistory(expression.value.expr_id);
+  if (ok && expression.value) {
+    await fetchHistory(expression.value.expr_id);
+    markCurrentExpression(expression.value.expr_id);
+  }
 }
 async function undo() {
   if (!expression.value) return;
   const ok = await undoExpression(expression.value.expr_id, 1);
-  if (ok && expression.value) await fetchHistory(expression.value.expr_id);
+  if (ok && expression.value) {
+    await fetchHistory(expression.value.expr_id);
+    markCurrentExpression(expression.value.expr_id);
+  }
 }
 async function redo() {
   if (!expression.value) return;
   const ok = await undoExpression(expression.value.expr_id, -1);
-  if (ok && expression.value) await fetchHistory(expression.value.expr_id);
+  if (ok && expression.value) {
+    await fetchHistory(expression.value.expr_id);
+    markCurrentExpression(expression.value.expr_id);
+  }
 }
 
 function renderLatex() {

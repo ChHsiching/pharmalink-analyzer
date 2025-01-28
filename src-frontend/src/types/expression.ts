@@ -11,6 +11,8 @@ export interface ExpressionResponse {
   complexity: number;
   r2_score: number;
   tree: ExpressionNode;
+  pareto_count: number;
+  pareto_index: number;
 }
 
 export interface ExpressionHistoryEntry {

@@ -21,7 +21,7 @@ class FormulationService:
         cp_dir, config = self._resolver.resolve(state.model_id)
         features, feature_names = self._resolver.get_features(config.dataset_id)
 
-        model = load_model(cp_dir, config.n_features, config)
+        model = load_model(cp_dir, len(feature_names), config)
         with torch.no_grad():
             X_tensor = torch.tensor(features, dtype=torch.float32)
             _, attn_weights = model(X_tensor)

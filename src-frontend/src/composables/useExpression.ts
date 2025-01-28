@@ -65,27 +65,29 @@ export function useExpression() {
     }
   }
 
-  async function simplifyExpression(exprId: string) {
+  async function simplifyExpression(exprId: string): Promise<boolean> {
     const res = await safeRequest(
       () => apiClient.post<ExpressionResponse>(
         `/expressions/simplify/${exprId}`,
       ),
       loading, error, "精简失败",
     );
-    if (res) expression.value = res.data;
+    if (res) { expression.value = res.data; return true; }
+    return false;
   }
 
-  async function optimizeExpression(exprId: string) {
+  async function optimizeExpression(exprId: string): Promise<boolean> {
     const res = await safeRequest(
       () => apiClient.post<ExpressionResponse>(
         `/expressions/optimize/${exprId}`,
       ),
       loading, error, "优化失败",
     );
-    if (res) expression.value = res.data;
+    if (res) { expression.value = res.data; return true; }
+    return false;
   }
 
-  async function fetchHistory(exprId: string) {
+  async function fetchHistory(exprId: string): Promise<void> {
     const res = await safeRequest(
       () => apiClient.get<ExpressionHistoryResponse>(
         `/expressions/history/${exprId}`,
@@ -95,7 +97,7 @@ export function useExpression() {
     if (res) history.value = res.data;
   }
 
-  async function undoExpression(exprId: string, steps = 1) {
+  async function undoExpression(exprId: string, steps = 1): Promise<boolean> {
     const res = await safeRequest(
       () => apiClient.post<ExpressionResponse>(
         `/expressions/undo/${exprId}`,
@@ -104,7 +106,8 @@ export function useExpression() {
       ),
       loading, error, "撤销失败",
     );
-    if (res) expression.value = res.data;
+    if (res) { expression.value = res.data; return true; }
+    return false;
   }
 
   return {

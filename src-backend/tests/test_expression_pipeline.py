@@ -97,13 +97,14 @@ def _fake_pairs():
 
 
 def _fake_best():
-    x = sympy.Symbol("A")
-    expr = x ** 2 + 1
+    a = sympy.Symbol("A")
+    b = sympy.Symbol("B")
+    expr = a ** 2 + b ** 2 + 1
     return {
         "sympy_expr": expr,
-        "latex": "A^{2} + 1",
-        "complexity": 3,
-        "loss": 0.01,
+        "latex": "A^{2} + B^{2} + 1",
+        "complexity": 7,
+        "loss": 0.005,
     }
 
 
@@ -111,9 +112,9 @@ def _fake_pareto():
     a = sympy.Symbol("A")
     b = sympy.Symbol("B")
     return [
-        {"index": 0, "latex": "A + B", "complexity": 3, "loss": 0.05, "sympy_expr": a + b},
-        {"index": 1, "latex": "A^{2} + 1", "complexity": 5, "loss": 0.01, "sympy_expr": a ** 2 + 1},
-        {"index": 2, "latex": "A^{2} + B^{2} + 1", "complexity": 7, "loss": 0.005, "sympy_expr": a ** 2 + b ** 2 + 1},
+        {"index": 0, "latex": "A + B", "complexity": 3, "loss": 0.05, "r2_score": 0.80, "sympy_expr": a + b},
+        {"index": 1, "latex": "A^{2} + 1", "complexity": 5, "loss": 0.01, "r2_score": 0.90, "sympy_expr": a ** 2 + 1},
+        {"index": 2, "latex": "A^{2} + B^{2} + 1", "complexity": 7, "loss": 0.005, "r2_score": 0.95, "sympy_expr": a ** 2 + b ** 2 + 1},
     ]
 
 
@@ -122,6 +123,22 @@ def _fake_model():
     model = MagicMock()
     model.score.return_value = 0.95
     return model
+
+
+def _setup_pareto_mocks(mock_pareto_reg, mock_best):
+    """Configure mocks for run_pareto_regression + extract_best_equation."""
+    eqs = _fake_pareto()
+    mock_models = [_fake_model(), _fake_model(), _fake_model()]
+    mock_models[0].score.return_value = eqs[0]["r2_score"]
+    mock_models[1].score.return_value = eqs[1]["r2_score"]
+    mock_models[2].score.return_value = eqs[2]["r2_score"]
+    mock_pareto_reg.return_value = mock_models
+    mock_best.side_effect = [
+        {"sympy_expr": eqs[0]["sympy_expr"], "latex": eqs[0]["latex"], "complexity": eqs[0]["complexity"], "loss": eqs[0]["loss"]},
+        {"sympy_expr": eqs[1]["sympy_expr"], "latex": eqs[1]["latex"], "complexity": eqs[1]["complexity"], "loss": eqs[1]["loss"]},
+        {"sympy_expr": eqs[2]["sympy_expr"], "latex": eqs[2]["latex"], "complexity": eqs[2]["complexity"], "loss": eqs[2]["loss"]},
+    ]
+    return mock_models
 
 
 # ---------------------------------------------------------------------------
@@ -155,15 +172,14 @@ class TestPipelineResult:
 # ---------------------------------------------------------------------------
 
 class TestPipelineRun:
-    @patch("app.services.expression_pipeline.run_symbolic_regression")
-    @patch("app.services.expression_pipeline.extract_pareto_equations")
     @patch("app.services.expression_pipeline.extract_best_equation")
+    @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_run_returns_pipeline_result(
-        self, mock_attn, mock_pairs, mock_interact, mock_best,
-        mock_pareto, mock_regression, pipeline, checkpoint_dir,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        pipeline, checkpoint_dir,
     ):
         _write_checkpoint(checkpoint_dir)
         mock_attn.return_value = _fake_attention_matrix()
@@ -172,17 +188,14 @@ class TestPipelineRun:
             np.zeros((20, 7)),
             ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
         )
-        fake_model = _fake_model()
-        mock_regression.return_value = fake_model
-        mock_best.return_value = _fake_best()
-        mock_pareto.return_value = _fake_pareto()
+        _setup_pareto_mocks(mock_pareto_reg, mock_best)
 
         result = pipeline.run("model-abc")
 
         assert isinstance(result, PipelineResult)
-        assert result.latex == "A^{2} + 1"
-        assert result.complexity == 3
-        assert result.loss == 0.01
+        assert result.latex == "A^{2} + B^{2} + 1"
+        assert result.complexity == 7
+        assert result.loss == 0.005
         assert result.r2_score == 0.95
         assert len(result.pareto_equations) == 3
 
@@ -200,15 +213,14 @@ class TestPipelineRun:
         with pytest.raises(DatasetNotFoundError):
             pipeline.run("model-abc")
 
-    @patch("app.services.expression_pipeline.run_symbolic_regression")
-    @patch("app.services.expression_pipeline.extract_pareto_equations")
     @patch("app.services.expression_pipeline.extract_best_equation")
+    @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_uses_train_test_split_for_r2(
-        self, mock_attn, mock_pairs, mock_interact, mock_best,
-        mock_pareto, mock_regression, pipeline, checkpoint_dir,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        pipeline, checkpoint_dir,
     ):
         """Verify the pipeline splits data into train/test before fitting and scoring.
 
@@ -222,38 +234,34 @@ class TestPipelineRun:
             np.zeros((20, 7)),
             ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
         )
-        fake_model = _fake_model()
-        mock_regression.return_value = fake_model
-        mock_best.return_value = _fake_best()
-        mock_pareto.return_value = _fake_pareto()
+        mock_models = _setup_pareto_mocks(mock_pareto_reg, mock_best)
 
         pipeline.run("model-abc")
 
-        # run_symbolic_regression should receive a training subset (< 20 rows)
-        X_train = mock_regression.call_args[0][0]
-        y_train = mock_regression.call_args[0][1]
+        # run_pareto_regression should receive a training subset (< 20 rows)
+        X_train = mock_pareto_reg.call_args[0][0]
+        y_train = mock_pareto_reg.call_args[0][1]
         assert X_train.shape[0] < 20, (
             f"Expected train rows < 20, got {X_train.shape[0]}"
         )
 
         # model.score should receive the held-out test subset
-        X_test = fake_model.score.call_args[0][0]
-        y_test = fake_model.score.call_args[0][1]
+        X_test = mock_models[0].score.call_args[0][0]
+        y_test = mock_models[0].score.call_args[0][1]
 
         # train + test must equal the full dataset (20 rows)
         assert X_train.shape[0] + X_test.shape[0] == 20, (
             f"train ({X_train.shape[0]}) + test ({X_test.shape[0]}) != 20"
         )
 
-    @patch("app.services.expression_pipeline.run_symbolic_regression")
-    @patch("app.services.expression_pipeline.extract_pareto_equations")
     @patch("app.services.expression_pipeline.extract_best_equation")
+    @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_run_forwards_preset_to_regressor(
-        self, mock_attn, mock_pairs, mock_interact, mock_best,
-        mock_pareto, mock_regression, pipeline, checkpoint_dir,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        pipeline, checkpoint_dir,
     ):
         _write_checkpoint(checkpoint_dir)
         mock_attn.return_value = _fake_attention_matrix()
@@ -262,14 +270,40 @@ class TestPipelineRun:
             np.zeros((20, 7)),
             ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
         )
-        mock_regression.return_value = _fake_model()
-        mock_best.return_value = _fake_best()
-        mock_pareto.return_value = _fake_pareto()
+        _setup_pareto_mocks(mock_pareto_reg, mock_best)
 
         pipeline.run("model-abc", preset="quick")
 
-        mock_regression.assert_called_once()
-        assert mock_regression.call_args[1]["preset"] == "quick"
+        mock_pareto_reg.assert_called_once()
+        assert mock_pareto_reg.call_args[1]["preset"] == "quick"
+
+    @patch("app.services.expression_pipeline.extract_best_equation")
+    @patch("app.services.expression_pipeline.run_pareto_regression")
+    @patch("app.services.expression_pipeline.generate_interaction_features")
+    @patch("app.services.expression_pipeline.extract_top_pairs")
+    @patch("app.services.expression_pipeline.extract_attention_weights")
+    def test_run_uses_pareto_regression(
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        pipeline, checkpoint_dir,
+    ):
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.return_value = (
+            np.zeros((20, 7)),
+            ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
+        )
+        _setup_pareto_mocks(mock_pareto_reg, mock_best)
+
+        result = pipeline.run("model-abc")
+
+        mock_pareto_reg.assert_called_once()
+        assert len(result.pareto_equations) == 3
+        for eq in result.pareto_equations:
+            assert "r2_score" in eq
+        assert result.complexity == 7
+
+
 # ---------------------------------------------------------------------------
 # TestPipelineErrorWrapping
 # ---------------------------------------------------------------------------
@@ -310,12 +344,12 @@ class TestPipelineErrorWrapping:
             pipeline.run("model-abc")
 
     @patch("app.services.expression_pipeline.extract_best_equation")
-    @patch("app.services.expression_pipeline.run_symbolic_regression")
+    @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_wraps_equation_extraction_error(
-        self, mock_attn, mock_pairs, mock_interact, mock_regression, mock_best,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
         pipeline, checkpoint_dir,
     ):
         _write_checkpoint(checkpoint_dir)
@@ -325,7 +359,8 @@ class TestPipelineErrorWrapping:
             np.zeros((20, 7)),
             ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
         )
-        mock_regression.return_value = _fake_model()
+        mock_models = [_fake_model(), _fake_model(), _fake_model()]
+        mock_pareto_reg.return_value = mock_models
         mock_best.side_effect = KeyError("no best equation")
 
         with pytest.raises(SymbolicRegressionError):

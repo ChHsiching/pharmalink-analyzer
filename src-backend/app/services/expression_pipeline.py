@@ -16,9 +16,8 @@ from app.exceptions import DomainError, SymbolicRegressionError
 from app.ml.attention_extractor import extract_attention_weights, extract_top_pairs
 from app.ml.symbolic_regressor import (
     extract_best_equation,
-    extract_pareto_equations,
     generate_interaction_features,
-    run_symbolic_regression,
+    run_pareto_regression,
 )
 from app.services.checkpoint_resolver import CheckpointResolver
 
@@ -52,8 +51,8 @@ class ExpressionPipeline:
 
         Steps 1–5: resolve checkpoint, load features, extract attention,
         find top pairs, generate interaction features.
-        Steps 6: run symbolic regression (not wrapped).
-        Steps 7–9: extract best/pareto equations, compute R².
+        Step 6: run parallel pareto regression (3 models).
+        Steps 7–9: extract equations from all models, compute R² for each.
         """
         cp_dir, config = self._resolver.resolve(model_id)
 
@@ -78,23 +77,32 @@ class ExpressionPipeline:
         X_train, X_test, y_train, y_test = train_test_split(
             X_aug, y, test_size=0.2, random_state=42,
         )
-        model = run_symbolic_regression(X_train, y_train, aug_names, preset=preset)
+        models = run_pareto_regression(X_train, y_train, aug_names, preset=preset)
 
-        # Steps 7–9: any Exception → SymbolicRegressionError
         try:
-            best = extract_best_equation(model)
-            pareto = extract_pareto_equations(model)
-            r2 = float(model.score(X_test, y_test))
+            pareto_equations = []
+            for i, model in enumerate(models):
+                eq = extract_best_equation(model)
+                r2 = float(model.score(X_test, y_test))
+                pareto_equations.append({
+                    "index": i,
+                    "sympy_expr": eq["sympy_expr"],
+                    "latex": eq["latex"],
+                    "complexity": eq["complexity"],
+                    "loss": eq["loss"],
+                    "r2_score": r2,
+                })
+            best_eq = pareto_equations[-1]
         except Exception as e:
             raise SymbolicRegressionError(
                 f"Equation extraction failed: {e}"
             ) from e
 
         return PipelineResult(
-            sympy_expr=best["sympy_expr"],
-            latex=best["latex"],
-            complexity=best["complexity"],
-            loss=best["loss"],
-            r2_score=r2,
-            pareto_equations=pareto,
+            sympy_expr=best_eq["sympy_expr"],
+            latex=best_eq["latex"],
+            complexity=best_eq["complexity"],
+            loss=best_eq["loss"],
+            r2_score=best_eq["r2_score"],
+            pareto_equations=pareto_equations,
         )

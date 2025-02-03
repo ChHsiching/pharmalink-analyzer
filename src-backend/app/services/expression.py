@@ -180,23 +180,49 @@ class ExpressionService:
         return self._to_response(state)
 
     def optimize(self, expr_id: str) -> ExpressionResponse:
+        import numpy as np
+
+        from app.ml.expression_impact import compute_impact
+        from app.ml.expression_tree import refit_coefficients
+
         state = self._state.get(expr_id)
+        old_r2 = state.current_r2
 
-        current_idx = 0
-        for i, eq in enumerate(state.pareto_equations):
-            if eq["complexity"] >= state.current_complexity:
-                current_idx = i
-                break
-
-        next_idx = max(0, current_idx - 1)
-        if next_idx == current_idx:
+        if not state.X_train or not state.aug_names:
             return self._to_response(state)
 
-        chosen = state.pareto_equations[next_idx]
-        state.current_sympy = chosen["sympy_expr"]
-        state.current_latex = chosen["latex"]
-        state.current_complexity = chosen["complexity"]
-        state.current_r2 = chosen["r2_score"]
+        optimized = refit_coefficients(
+            state.current_sympy,
+            state.X_train,
+            state.y_train,
+            state.aug_names,
+        )
+
+        new_indicators = compute_indicators_from_expr(
+            optimized, state.X_train, state.X_test,
+            state.y_train, state.y_test, state.aug_names,
+        )
+        new_r2 = new_indicators.get("test_r2", old_r2)
+
+        if new_r2 < old_r2:
+            return self._to_response(state)
+
+        state.current_sympy = optimized
+        state.current_latex = expr_to_latex(optimized)
+        state.current_complexity = get_complexity(optimized)
+        state.current_r2 = new_r2
+        state.indicators = new_indicators
+
+        if state.X_raw and state.feature_names:
+            state.variable_impact = compute_impact(
+                sympy_expr=optimized,
+                feature_names=state.feature_names,
+                X=np.array(state.X_raw),
+                pairs_raw=state.pairs_raw,
+                attention_matrix=np.array(state.attention_matrix),
+                aug_names=state.aug_names,
+            )
+
         self._state.push_history(state, "optimize")
         return self._to_response(state)
 

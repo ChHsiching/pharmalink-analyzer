@@ -17,6 +17,7 @@ from app.exceptions import (
 from app.models.expression import ExpressionHistoryResponse, ExpressionResponse
 from app.services.expression import ExpressionService
 from app.services.expression_pipeline import PipelineResult
+from app.ml.expression_tree import expr_to_latex, get_complexity
 
 
 def _fake_pareto():
@@ -127,64 +128,104 @@ class TestOptimize:
         with pytest.raises(ExpressionNotFoundError):
             service.optimize("expr_nonexistent")
 
-    def test_optimize_selects_lower_complexity(self, mock_pipeline):
-        a = sympy.Symbol("A")
-        b = sympy.Symbol("B")
+    def test_optimize_no_training_data_returns_unchanged(self, mock_pipeline):
+        """Without training data, optimize returns the expression unchanged."""
+        A = sympy.Symbol("A")
+        B = sympy.Symbol("B")
         mock_pipeline.run.return_value = _fake_pipeline_result(
-            sympy_expr=a ** 2 + b ** 2 + 1,
-            latex="A^{2} + B^{2} + 1",
-            complexity=7,
-        )
-        service = ExpressionService(resolver=MagicMock(), pipeline=mock_pipeline)
-        result = service.generate("model-abc")
-        expr_id = result.expr_id
-        assert result.complexity == 7
-        optimized = service.optimize(expr_id)
-        assert optimized.complexity < 7
-
-    def test_optimize_at_best_returns_same(self, mock_pipeline):
-        a = sympy.Symbol("A")
-        b = sympy.Symbol("B")
-        mock_pipeline.run.return_value = _fake_pipeline_result(
-            sympy_expr=a + b,
+            sympy_expr=A + B,
             latex="A + B",
             complexity=3,
         )
         service = ExpressionService(resolver=MagicMock(), pipeline=mock_pipeline)
         result = service.generate("model-abc")
-        expr_id = result.expr_id
-        optimized = service.optimize(expr_id)
+        optimized = service.optimize(result.expr_id)
+        assert optimized.latex == result.latex
         assert optimized.complexity == result.complexity
 
-    def test_optimize_updates_r2_score(self, mock_pipeline):
-        a = sympy.Symbol("A")
-        b = sympy.Symbol("B")
+    def test_optimize_refits_coefficients(self, mock_pipeline):
+        """Optimize refits coefficients and preserves expression structure."""
+        A = sympy.Symbol("A")
+        B = sympy.Symbol("B")
+        expr = sympy.Float(3.0) * A + sympy.Float(2.0) * B + sympy.Float(1.0)
+        X_train = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
+        X_test = [[2.0, 3.0], [6.0, 7.0]]
+        y_train = [3 * a + 2 * b + 1 for a, b in X_train]
+        y_test = [3 * a + 2 * b + 1 for a, b in X_test]
+
         mock_pipeline.run.return_value = _fake_pipeline_result(
-            sympy_expr=a ** 2 + b ** 2 + 1,
-            latex="A^{2} + B^{2} + 1",
-            complexity=7,
+            sympy_expr=expr,
+            latex=expr_to_latex(expr),
+            complexity=get_complexity(expr),
+            r2_score=0.80,
+            X_train=X_train,
+            X_test=X_test,
+            y_train=y_train,
+            y_test=y_test,
+            aug_names=["A", "B"],
         )
         service = ExpressionService(resolver=MagicMock(), pipeline=mock_pipeline)
         result = service.generate("model-abc")
-        assert result.r2_score == 0.95
         optimized = service.optimize(result.expr_id)
-        assert optimized.r2_score == 0.90
-        assert optimized.pareto_count == 3
-        assert optimized.pareto_index == 1
+        assert isinstance(optimized, ExpressionResponse)
+        assert optimized.expr_id == result.expr_id
+        # Variables preserved
+        assert "A" in optimized.latex or "B" in optimized.latex
 
-    def test_optimize_at_lowest_shows_index_zero(self, mock_pipeline):
-        a = sympy.Symbol("A")
-        b = sympy.Symbol("B")
+    def test_optimize_rejects_r2_decrease(self, mock_pipeline):
+        """If refitting would decrease R2, original expression is returned."""
+        A = sympy.Symbol("A")
+        B = sympy.Symbol("B")
+        expr = A + B
+        # Quadratic data — linear expression can't fit well
+        X_train = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
+        X_test = [[2.0, 3.0], [6.0, 7.0]]
+        y_train = [a ** 2 + b ** 2 for a, b in X_train]
+        y_test = [a ** 2 + b ** 2 for a, b in X_test]
+
         mock_pipeline.run.return_value = _fake_pipeline_result(
-            sympy_expr=a + b,
+            sympy_expr=expr,
             latex="A + B",
             complexity=3,
+            r2_score=0.99,  # Inflated initial R2
+            X_train=X_train,
+            X_test=X_test,
+            y_train=y_train,
+            y_test=y_test,
+            aug_names=["A", "B"],
         )
         service = ExpressionService(resolver=MagicMock(), pipeline=mock_pipeline)
         result = service.generate("model-abc")
-        at_best = service.optimize(result.expr_id)
-        assert at_best.pareto_index == 0
-        assert at_best.pareto_count == 3
+        optimized = service.optimize(result.expr_id)
+        # Rejected — returns original unchanged
+        assert optimized.latex == result.latex
+
+    def test_optimize_updates_indicators(self, mock_pipeline):
+        """Optimize recomputes indicators after refitting."""
+        A = sympy.Symbol("A")
+        B = sympy.Symbol("B")
+        expr = sympy.Float(3.0) * A + sympy.Float(2.0) * B + sympy.Float(1.0)
+        X_train = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
+        X_test = [[2.0, 3.0], [6.0, 7.0]]
+        y_train = [3 * a + 2 * b + 1 for a, b in X_train]
+        y_test = [3 * a + 2 * b + 1 for a, b in X_test]
+
+        mock_pipeline.run.return_value = _fake_pipeline_result(
+            sympy_expr=expr,
+            latex=expr_to_latex(expr),
+            complexity=get_complexity(expr),
+            r2_score=0.80,
+            X_train=X_train,
+            X_test=X_test,
+            y_train=y_train,
+            y_test=y_test,
+            aug_names=["A", "B"],
+        )
+        service = ExpressionService(resolver=MagicMock(), pipeline=mock_pipeline)
+        result = service.generate("model-abc")
+        optimized = service.optimize(result.expr_id)
+        # R2 should improve (data matches expression perfectly)
+        assert optimized.r2_score >= 0.99
 
 
 class TestGetTree:

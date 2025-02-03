@@ -174,6 +174,73 @@ def compute_indicators_from_expr(
     }
 
 
+def _collect_and_parametrize(expr: Basic) -> tuple[Basic, list[tuple[int, float]]]:
+    """Walk expression tree, replace coefficient constants with parameter symbols.
+
+    Excludes Pow exponents (operator constants) — only collects coefficient constants.
+    Returns (parametrized_expression, [(param_index, original_value), ...]).
+    """
+    constants: list[tuple[int, float]] = []
+    counter = [0]
+
+    def _walk(node: Basic) -> Basic:
+        if node.is_Number:
+            idx = counter[0]
+            counter[0] += 1
+            constants.append((idx, float(node)))
+            return sympy.Symbol(f"_p{idx}")
+        if not node.args:
+            return node
+        new_args = []
+        for i, arg in enumerate(node.args):
+            if isinstance(node, sympy.Pow) and i == 1:
+                new_args.append(arg)
+            else:
+                new_args.append(_walk(arg))
+        return node.func(*new_args)
+
+    parametrized = _walk(expr)
+    return parametrized, constants
+
+
+def refit_coefficients(
+    expr: Basic,
+    X_train: list[list[float]],
+    y_train: list[float],
+    aug_names: list[str],
+) -> Basic:
+    """Refit numeric coefficients in an expression using least squares.
+
+    Walks the expression tree, collects numeric constants (excluding Pow exponents),
+    replaces them with parameters, fits via scipy.optimize.least_squares, and
+    substitutes the fitted values back.
+    """
+    from scipy.optimize import least_squares
+
+    parametrized, constants = _collect_and_parametrize(expr)
+    if not constants:
+        return expr
+
+    params = [sympy.Symbol(f"_p{i}") for i, _ in constants]
+    all_symbols = [sympy.Symbol(n) for n in aug_names] + params
+    func = sympy.lambdify(all_symbols, parametrized, modules=["numpy"])
+
+    X_np = np.array(X_train)
+    y_np = np.array(y_train)
+    initial = np.array([val for _, val in constants])
+
+    def residuals(p: np.ndarray) -> np.ndarray:
+        preds = np.array([float(func(*row, *p)) for row in X_np])
+        return preds - y_np
+
+    result = least_squares(residuals, initial, method="lm")
+
+    subs = {}
+    for (idx, _), fitted in zip(constants, result.x):
+        subs[sympy.Symbol(f"_p{idx}")] = sympy.Float(float(fitted))
+    return parametrized.subs(subs)
+
+
 def get_complexity(expr: Basic) -> int:
     """Return the operation count of a SymPy expression as a complexity measure."""
     return sympy.count_ops(expr)

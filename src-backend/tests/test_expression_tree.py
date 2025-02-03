@@ -191,3 +191,65 @@ def test_compute_indicators_empty_data():
     A = symbols("A")
     indicators = compute_indicators_from_expr(A, [], [], [], [], ["A"])
     assert indicators == {}
+
+
+# --- refit_coefficients ---
+
+
+def test_refit_recovers_linear_coefficients():
+    """Refit 3*A + 2*B + 1 on data generated from that exact expression."""
+    from app.ml.expression_tree import refit_coefficients
+
+    A, B = symbols("A B")
+    expr = sympy.Float(3.0) * A + sympy.Float(2.0) * B + sympy.Float(1.0)
+    X_train = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
+    y_train = [3 * a + 2 * b + 1 for a, b in X_train]
+
+    result = refit_coefficients(expr, X_train, y_train, ["A", "B"])
+
+    assert result.free_symbols == {A, B}
+    func = sympy.lambdify([A, B], result, modules=["numpy"])
+    for row, expected in zip(X_train, y_train):
+        assert abs(float(func(*row)) - expected) < 0.01
+
+
+def test_refit_preserves_pow_exponents():
+    """Exponent in x**2 must NOT be treated as a fittable coefficient."""
+    from app.ml.expression_tree import refit_coefficients
+
+    x0 = symbols("x0")
+    expr = sympy.Float(5.0) * x0 ** 2
+    X_train = [[1.0], [2.0], [3.0], [4.0]]
+    y_train = [3 * a ** 2 for a, in X_train]
+
+    result = refit_coefficients(expr, X_train, y_train, ["x0"])
+    assert result.free_symbols == {x0}
+
+    func = sympy.lambdify([x0], result, modules=["numpy"])
+    for row, expected in zip(X_train, y_train):
+        assert abs(float(func(*row)) - expected) < 0.1
+
+
+def test_refit_no_constants_returns_original():
+    """Expression with no numeric constants (just variables) is returned unchanged."""
+    from app.ml.expression_tree import refit_coefficients
+
+    x0, x1 = symbols("x0 x1")
+    expr = x0 + x1
+    result = refit_coefficients(expr, [[1.0, 2.0]], [3.0], ["x0", "x1"])
+    assert result == expr
+
+
+def test_refit_corrects_wrong_coefficients():
+    """Start with wrong coefficient, refit should correct it."""
+    from app.ml.expression_tree import refit_coefficients
+
+    A = symbols("A")
+    expr = sympy.Float(10.0) * A  # wrong coefficient
+    X_train = [[1.0], [2.0], [3.0], [4.0], [5.0]]
+    y_train = [2 * a for a, in X_train]  # data from 2*A
+
+    result = refit_coefficients(expr, X_train, y_train, ["A"])
+    func = sympy.lambdify([A], result, modules=["numpy"])
+    for row, expected in zip(X_train, y_train):
+        assert abs(float(func(*row)) - expected) < 0.1

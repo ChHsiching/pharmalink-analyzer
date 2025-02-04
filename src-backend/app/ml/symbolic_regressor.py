@@ -84,9 +84,9 @@ def _parse(tokens: list[str], pos: int, var_map: dict) -> tuple:
 
 
 PRESET_CONFIG = {
-    "quick": {"population_size": 500, "generations": 30, "parsimony_coefficient": 0.001, "init_depth": (2, 6), "const_range": (-2.0, 2.0)},
-    "standard": {"population_size": 1000, "generations": 50, "parsimony_coefficient": 0.0005, "init_depth": (2, 6), "const_range": (-2.0, 2.0)},
-    "thorough": {"population_size": 2000, "generations": 80, "parsimony_coefficient": 0.0002, "init_depth": (2, 8), "const_range": (-2.0, 2.0)},
+    "quick": {"population_size": 500, "generations": 30, "parsimony_coefficient": 0.0003, "init_depth": (2, 10), "const_range": (-2.0, 2.0)},
+    "standard": {"population_size": 1000, "generations": 50, "parsimony_coefficient": 0.0005, "init_depth": (2, 10), "const_range": (-2.0, 2.0)},
+    "thorough": {"population_size": 2000, "generations": 80, "parsimony_coefficient": 0.0002, "init_depth": (2, 12), "const_range": (-2.0, 2.0)},
 }
 
 
@@ -165,7 +165,7 @@ def run_pareto_regression(X, y, feature_names, preset="standard"):
 
     preset_params = PRESET_CONFIG.get(preset, PRESET_CONFIG["standard"])
     base_parsimony = preset_params["parsimony_coefficient"]
-    parsimony_coefficients = [0.0, base_parsimony, base_parsimony * 4]
+    parsimony_coefficients = [base_parsimony * 0.25, base_parsimony, base_parsimony * 4]
 
     def _fit_single(parsimony_coefficient):
         model = SymbolicRegressor(

@@ -1,0 +1,22 @@
+{
+  "name": "pharmalink-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5",
+    "vue-router": "^4.5",
+    "axios": "^1.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2",
+    "typescript": "^5.7",
+    "vite": "^6.2",
+    "vue-tsc": "^2.2"
+  }
+}

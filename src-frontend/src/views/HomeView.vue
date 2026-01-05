@@ -6,6 +6,9 @@
       Backend: {{ backendStatus }}
     </p>
     <p v-else class="status error">Backend: connecting...</p>
+    <nav class="nav">
+      <router-link to="/data-import">数据导入</router-link>
+    </nav>
   </div>
 </template>
 
@@ -38,4 +41,15 @@ onMounted(async () => {
 h1 { color: #2e7d32; }
 .status { color: #4caf50; }
 .status.error { color: #f44336; }
+.nav {
+  margin-top: 20px;
+}
+.nav a {
+  color: #4caf50;
+  text-decoration: none;
+  font-size: 16px;
+}
+.nav a:hover {
+  text-decoration: underline;
+}
 </style>

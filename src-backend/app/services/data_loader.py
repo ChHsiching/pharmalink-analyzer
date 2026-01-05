@@ -1,9 +1,8 @@
 from pathlib import Path
 import pandas as pd
 
+from app.config import DATA_DIR
 from app.models.dataset import ColumnStats, DatasetMeta, DatasetDetail, DatasetStatsResponse
-
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "docs" / "csv_data"
 
 
 class DataLoader:
@@ -77,6 +76,11 @@ class DataLoader:
                 )
             )
         return DatasetStatsResponse(dataset_id=dataset_id, stats=stats)
+
+    def get_dataframe(self, dataset_id: str) -> pd.DataFrame | None:
+        if dataset_id not in self._datasets:
+            return None
+        return self._datasets[dataset_id][1].copy()
 
     def add_dataset(
         self, filename: str, content: bytes, name: str | None = None

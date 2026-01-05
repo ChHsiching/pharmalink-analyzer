@@ -8,6 +8,7 @@
     <p v-else class="status error">Backend: connecting...</p>
     <nav class="nav">
       <router-link to="/data-import">数据导入</router-link>
+      <router-link to="/training">模型训练</router-link>
     </nav>
   </div>
 </template>

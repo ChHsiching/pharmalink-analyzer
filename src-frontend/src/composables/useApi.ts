@@ -1,7 +1,7 @@
 import axios from "axios";
 import type { HealthResponse } from "@/types/api";
 
-const apiClient = axios.create({
+export const apiClient = axios.create({
   baseURL: "http://localhost:8765/api/v1",
   timeout: 10000,
 });

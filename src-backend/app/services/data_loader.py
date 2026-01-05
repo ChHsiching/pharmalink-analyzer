@@ -1,9 +1,8 @@
 from pathlib import Path
 import pandas as pd
 
+from app.config import DATA_DIR
 from app.models.dataset import ColumnStats, DatasetMeta, DatasetDetail, DatasetStatsResponse
-
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "docs" / "csv_data"
 
 
 class DataLoader:

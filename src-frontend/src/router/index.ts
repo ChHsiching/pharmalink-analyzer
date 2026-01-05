@@ -14,6 +14,11 @@ const router = createRouter({
       name: "data-import",
       component: () => import("@/views/DataImportView.vue"),
     },
+    {
+      path: "/training",
+      name: "training",
+      component: () => import("@/views/TrainingConfigView.vue"),
+    },
   ],
 });
 

@@ -5,6 +5,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS, API_PREFIX
+from app.api.analysis import router as analysis_router
 from app.api.datasets import router as datasets_router
 from app.api.health import router as health_router
 from app.api.training import router as training_router
@@ -31,6 +32,7 @@ app.add_middleware(
 app.include_router(health_router, prefix=API_PREFIX)
 app.include_router(datasets_router, prefix=API_PREFIX)
 app.include_router(training_router, prefix=API_PREFIX)
+app.include_router(analysis_router, prefix=API_PREFIX)
 
 
 @app.websocket("/ws/train")

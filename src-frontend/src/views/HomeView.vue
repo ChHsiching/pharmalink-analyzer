@@ -10,6 +10,7 @@
       <router-link to="/data-import">数据导入</router-link>
       <router-link to="/training">模型训练</router-link>
       <router-link to="/analysis">注意力分析</router-link>
+      <router-link to="/expression">表达式推导</router-link>
     </nav>
   </div>
 </template>

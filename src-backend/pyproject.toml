@@ -10,6 +10,8 @@ dependencies = [
     "python-multipart>=0.0.27",
     "torch>=2.2",
     "scikit-learn>=1.4",
+    "sympy>=1.12",
+    "pysr>=0.18",
 ]
 
 [dependency-groups]

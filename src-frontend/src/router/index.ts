@@ -24,6 +24,11 @@ const router = createRouter({
       name: "analysis",
       component: () => import("@/views/AttentionAnalysisView.vue"),
     },
+    {
+      path: "/expression",
+      name: "expression",
+      component: () => import("@/views/ExpressionDerivationView.vue"),
+    },
   ],
 });
 

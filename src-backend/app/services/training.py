@@ -204,7 +204,10 @@ class TrainingService:
         ckpt_path.mkdir(exist_ok=True)
         torch.save(model_state, ckpt_path / "model.pt")
         (ckpt_path / "config.json").write_text(config.model_dump_json())
-        (ckpt_path / "metrics.json").write_text(json.dumps({"final_val_loss": val_loss}))
+        metrics_data: dict = {"final_val_loss": val_loss}
+        if self._progress:
+            metrics_data["history"] = [p.model_dump() for p in self._progress]
+        (ckpt_path / "metrics.json").write_text(json.dumps(metrics_data))
 
     def _finish(self, status: str, error: str | None = None):
         self._status = status

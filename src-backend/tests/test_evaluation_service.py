@@ -1,0 +1,146 @@
+# src-backend/tests/test_evaluation_service.py
+import json
+import numpy as np
+import pytest
+import torch
+import torch.nn as nn
+
+from app.ml.transformer import FeatureTransformer
+from app.models.training import TrainingConfig
+from app.services import evaluation as evaluation_module
+from app.services.data_loader import DataLoader
+
+
+@pytest.fixture
+def eval_service_env(tmp_path):
+    np.random.seed(42)
+    torch.manual_seed(42)
+
+    n_samples = 30
+    n_features = 5
+    rng = np.random.default_rng(42)
+    header = ",".join([f"f{i}" for i in range(n_features)] + ["target"])
+    rows_data = rng.standard_normal((n_samples, n_features + 1)).astype(np.float32)
+    rows_data[:, n_features] = rows_data[:, 0] * 2 + rows_data[:, 1] * 0.5 + rng.standard_normal(n_samples) * 0.1
+    rows = "\n".join(",".join(f"{v:.4f}" for v in row) for row in rows_data)
+    csv_path = tmp_path / "test_eval.csv"
+    csv_path.write_text(header + "\n" + rows)
+
+    dl = DataLoader()
+    meta, df = dl._load_csv(csv_path)
+    dl._datasets[meta.id] = (meta, df)
+
+    feature_names = meta.feature_names
+    X = df[feature_names].to_numpy().astype(np.float32)
+    y = df["target"].to_numpy().astype(np.float32)
+
+    config = TrainingConfig(
+        dataset_id=meta.id,
+        d_model=16, n_heads=2, n_layers=1, dropout=0.0,
+        k_folds=3, epochs=5,
+    )
+    model = FeatureTransformer(
+        n_features=n_features,
+        d_model=config.d_model, n_heads=config.n_heads,
+        n_layers=config.n_layers, dropout=config.dropout,
+    )
+    X_t = torch.tensor(X)
+    y_t = torch.tensor(y)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    loss_fn = nn.MSELoss()
+    model.train()
+    for _ in range(30):
+        pred, _ = model(X_t)
+        loss = loss_fn(pred, y_t)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    cp_base = tmp_path / "checkpoints"
+    cp_dir = cp_base / f"{meta.id}_task1"
+    cp_dir.mkdir(parents=True)
+    torch.save(model.state_dict(), cp_dir / "model.pt")
+    (cp_dir / "config.json").write_text(config.model_dump_json())
+
+    history = [
+        {"epoch": 1, "fold": 1, "train_loss": 0.5, "val_loss": 0.6, "r2": 0.5, "status": "training"},
+        {"epoch": 2, "fold": 1, "train_loss": 0.3, "val_loss": 0.4, "r2": 0.7, "status": "training"},
+        {"epoch": 1, "fold": 2, "train_loss": 0.4, "val_loss": 0.5, "r2": 0.6, "status": "training"},
+        {"epoch": 2, "fold": 2, "train_loss": 0.25, "val_loss": 0.35, "r2": 0.75, "status": "training"},
+    ]
+    (cp_dir / "metrics.json").write_text(json.dumps({
+        "final_val_loss": 0.1,
+        "history": history,
+    }))
+
+    evaluation_module.evaluation_service = evaluation_module.EvaluationService(
+        data_loader=dl, checkpoint_dir=cp_base,
+    )
+    return {"checkpoint_id": cp_dir.name}
+
+
+def test_get_metrics(eval_service_env):
+    svc = evaluation_module.evaluation_service
+    result = svc.get_metrics(eval_service_env["checkpoint_id"])
+    assert result.model_id == eval_service_env["checkpoint_id"]
+    assert len(result.folds) == 3
+    for f in result.folds:
+        assert f.r2 != 0 or f.mse > 0
+    assert result.aggregate.r2_mean != 0
+    assert result.aggregate.r2_std >= 0
+
+
+def test_get_predictions(eval_service_env):
+    svc = evaluation_module.evaluation_service
+    result = svc.get_predictions(eval_service_env["checkpoint_id"])
+    assert result.model_id == eval_service_env["checkpoint_id"]
+    assert len(result.predictions) > 0
+    for p in result.predictions:
+        assert isinstance(p.actual, float)
+        assert isinstance(p.predicted, float)
+
+
+def test_get_residuals(eval_service_env):
+    svc = evaluation_module.evaluation_service
+    result = svc.get_residuals(eval_service_env["checkpoint_id"])
+    assert result.model_id == eval_service_env["checkpoint_id"]
+    assert len(result.residuals) > 0
+    assert len(result.bins) > 0
+    total = sum(b.count for b in result.bins)
+    assert total == len(result.residuals)
+    assert isinstance(result.mean, float)
+    assert result.std >= 0
+
+
+def test_get_loss_curve(eval_service_env):
+    svc = evaluation_module.evaluation_service
+    result = svc.get_loss_curve(eval_service_env["checkpoint_id"])
+    assert result.model_id == eval_service_env["checkpoint_id"]
+    assert len(result.folds) == 2
+    assert result.folds[0].fold == 1
+    assert len(result.folds[0].points) == 2
+    assert result.folds[0].points[0].train_loss == 0.5
+
+
+def test_get_loss_curve_no_history(tmp_path):
+    cp_base = tmp_path / "checkpoints"
+    cp_dir = cp_base / "nohist_m1"
+    cp_dir.mkdir(parents=True)
+    config = TrainingConfig(dataset_id="none")
+    (cp_dir / "config.json").write_text(config.model_dump_json())
+    (cp_dir / "metrics.json").write_text('{"final_val_loss": 0.1}')
+    (cp_dir / "model.pt").write_text("")
+
+    evaluation_module.evaluation_service = evaluation_module.EvaluationService(
+        checkpoint_dir=cp_base,
+    )
+    result = evaluation_module.evaluation_service.get_loss_curve("nohist_m1")
+    assert result.folds == []
+
+
+def test_checkpoint_not_found():
+    from fastapi import HTTPException
+    svc = evaluation_module.EvaluationService()
+    with pytest.raises(HTTPException) as exc_info:
+        svc.get_metrics("nonexistent")
+    assert exc_info.value.status_code == 404

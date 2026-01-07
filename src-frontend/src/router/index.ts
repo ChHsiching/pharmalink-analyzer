@@ -19,6 +19,11 @@ const router = createRouter({
       name: "training",
       component: () => import("@/views/TrainingConfigView.vue"),
     },
+    {
+      path: "/analysis",
+      name: "analysis",
+      component: () => import("@/views/AttentionAnalysisView.vue"),
+    },
   ],
 });
 

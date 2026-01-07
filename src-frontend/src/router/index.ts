@@ -29,6 +29,11 @@ const router = createRouter({
       name: "expression",
       component: () => import("@/views/ExpressionDerivationView.vue"),
     },
+    {
+      path: "/evaluation",
+      name: "evaluation",
+      component: () => import("@/views/EvaluationView.vue"),
+    },
   ],
 });
 

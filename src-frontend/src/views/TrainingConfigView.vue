@@ -139,6 +139,7 @@ import { useDatasets } from "@/composables/useDatasets";
 import { useTraining } from "@/composables/useTraining";
 import type { DatasetMeta } from "@/types/dataset";
 import type { TrainingConfig } from "@/types/training";
+import { useWorkflow } from "@/composables/useWorkflow";
 
 use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -155,6 +156,8 @@ const {
   loadCheckpoint,
   disconnectProgress,
 } = useTraining();
+
+const { markHasCheckpoint } = useWorkflow();
 
 const datasets = ref<DatasetMeta[]>([]);
 
@@ -207,6 +210,10 @@ const chartOption = computed(() => {
 
 async function handleStart() {
   await startTraining(config.value);
+  await fetchCheckpoints();
+  if (checkpoints.value.length > 0) {
+    markHasCheckpoint();
+  }
 }
 
 async function handleStop() {
@@ -215,6 +222,7 @@ async function handleStop() {
 
 async function handleLoadCheckpoint(id: string) {
   await loadCheckpoint(id);
+  markHasCheckpoint();
 }
 
 onMounted(async () => {
@@ -225,6 +233,9 @@ onMounted(async () => {
   }
   await fetchStatus();
   await fetchCheckpoints();
+  if (checkpoints.value.length > 0) {
+    markHasCheckpoint();
+  }
 });
 
 onUnmounted(() => {

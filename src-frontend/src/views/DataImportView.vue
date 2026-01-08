@@ -103,6 +103,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useDatasets } from "@/composables/useDatasets";
+import { useWorkflow } from "@/composables/useWorkflow";
 import type {
   DatasetMeta,
   DatasetDetail,
@@ -112,6 +113,7 @@ import type {
 const { listDatasets, getDataset, getDatasetStats, uploadDataset, deleteDataset } =
   useDatasets();
 
+const { markDatasetsAvailable } = useWorkflow();
 const datasets = ref<DatasetMeta[]>([]);
 const selected = ref<DatasetDetail | null>(null);
 const stats = ref<DatasetStatsResponse | null>(null);
@@ -130,6 +132,9 @@ async function fetchData() {
   error.value = "";
   try {
     datasets.value = await listDatasets();
+    if (datasets.value.length > 0) {
+      markDatasetsAvailable();
+    }
   } catch {
     error.value = "无法连接后端";
   } finally {

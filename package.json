@@ -11,6 +11,7 @@
     "tauri:build": "cargo tauri build"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.1",
     "concurrently": "^9.1"
   }
 }

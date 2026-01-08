@@ -12,19 +12,21 @@
   "app": {
     "windows": [
       {
-        "title": "PharmaLink Analyzer",
+        "title": "PharmaLink Analyzer — 中药成分关联性分析",
         "width": 1280,
         "height": 800,
         "resizable": true,
+        "fullscreen": false,
         "center": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://localhost:8765 ws://localhost:8765; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+      "csp": null
     }
   },
   "bundle": {
     "active": true,
+    "targets": "all",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

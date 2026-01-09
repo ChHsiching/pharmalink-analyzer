@@ -6,7 +6,9 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+import app.api.training as _training_api_module
 from app.main import app
+from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader, data_loader
 from app.services.training import training_service
 
@@ -34,6 +36,11 @@ async def client(csv_dir, tmp_path):
     training_service._status = "idle"
     training_service._progress = []
     training_service._data_loader = data_loader
+
+    # Patch the resolver in the training API module to use test checkpoint dir
+    _training_api_module._resolver = CheckpointResolver(
+        checkpoint_dir=tmp_path / "ckpts", data_loader=data_loader,
+    )
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

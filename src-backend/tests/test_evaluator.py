@@ -1,16 +1,11 @@
-# src-backend/tests/test_evaluator.py
 import numpy as np
 import pytest
-import torch
-import torch.nn as nn
 
 from app.ml.evaluator import (
     compute_fold_metrics,
     evaluate_all_folds,
     compute_residual_bins,
 )
-from app.ml.transformer import FeatureTransformer
-from app.models.training import TrainingConfig
 
 
 class TestComputeFoldMetrics:
@@ -64,46 +59,14 @@ class TestComputeResidualBins:
 
 class TestEvaluateAllFolds:
     @pytest.fixture
-    def eval_env(self, tmp_path):
-        np.random.seed(42)
-        torch.manual_seed(42)
-
-        n_samples = 30
-        n_features = 5
-        rng = np.random.default_rng(42)
-        X = rng.standard_normal((n_samples, n_features)).astype(np.float32)
-        y = (X[:, 0] * 2 + X[:, 1] * 0.5 + rng.standard_normal(n_samples) * 0.1).astype(np.float32)
-
-        config = TrainingConfig(
+    def eval_env(self, make_checkpoint):
+        return make_checkpoint(
+            n_samples=30,
+            training_epochs=30,
+            checkpoint_name="checkpoints/test_task1",
             dataset_id="test",
-            d_model=16, n_heads=2, n_layers=1, dropout=0.0,
-            k_folds=3, epochs=5,
+            k_folds=3,
         )
-
-        model = FeatureTransformer(
-            n_features=n_features,
-            d_model=config.d_model, n_heads=config.n_heads,
-            n_layers=config.n_layers, dropout=config.dropout,
-        )
-        X_t = torch.tensor(X)
-        y_t = torch.tensor(y)
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-        loss_fn = nn.MSELoss()
-        model.train()
-        for _ in range(30):
-            pred, _ = model(X_t)
-            loss = loss_fn(pred, y_t)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        cp_dir = tmp_path / "checkpoints" / "test_task1"
-        cp_dir.mkdir(parents=True)
-        torch.save(model.state_dict(), cp_dir / "model.pt")
-        (cp_dir / "config.json").write_text(config.model_dump_json())
-        (cp_dir / "metrics.json").write_text('{"final_val_loss": 0.1}')
-
-        return {"cp_dir": cp_dir, "X": X, "y": y, "n_features": n_features, "config": config}
 
     def test_returns_per_fold_results(self, eval_env):
         results = evaluate_all_folds(

@@ -66,7 +66,7 @@ async def test_start_training_completes(service):
 
 
 @pytest.mark.asyncio
-async def test_start_training_saves_checkpoint(service):
+async def test_start_training_saves_checkpoint(service, tmp_path):
     config = TrainingConfig(
         dataset_id="fruit-test-tc",
         d_model=32, n_heads=2, n_layers=1,
@@ -81,9 +81,11 @@ async def test_start_training_saves_checkpoint(service):
         if service.get_status().status != "running":
             break
 
-    checkpoints = service.list_checkpoints()
+    ckpt_dir = tmp_path / "ckpts"
+    assert ckpt_dir.exists()
+    checkpoints = [d for d in ckpt_dir.iterdir() if d.is_dir() and (d / "config.json").exists()]
     assert len(checkpoints) == 1
-    assert checkpoints[0].dataset_id == "fruit-test-tc"
+    assert checkpoints[0].name.startswith("fruit-test-tc")
 
 
 @pytest.mark.asyncio

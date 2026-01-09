@@ -13,7 +13,6 @@ from sklearn.preprocessing import StandardScaler
 from app.config import CHECKPOINT_DIR
 from app.models.training import (
     TrainingConfig, TrainingProgress, TrainingStatusResponse,
-    CheckpointInfo,
 )
 from app.ml.transformer import FeatureTransformer
 from app.ml.augmentation import augment
@@ -218,22 +217,6 @@ class TrainingService:
             asyncio.run_coroutine_threadsafe(
                 self._progress_queue.put(msg), self._loop
             )
-
-    def list_checkpoints(self) -> list[CheckpointInfo]:
-        if not self._checkpoint_dir.exists():
-            return []
-        result = []
-        for d in sorted(self._checkpoint_dir.iterdir()):
-            if d.is_dir() and (d / "config.json").exists():
-                config = TrainingConfig.model_validate_json((d / "config.json").read_text())
-                metrics = json.loads((d / "metrics.json").read_text())
-                result.append(CheckpointInfo(
-                    id=d.name,
-                    dataset_id=config.dataset_id,
-                    config=config,
-                    final_loss=metrics.get("final_val_loss", 0),
-                ))
-        return result
 
 
 training_service = TrainingService()

@@ -1,4 +1,3 @@
-# src-backend/app/ml/evaluator.py
 from pathlib import Path
 
 import numpy as np
@@ -6,7 +5,7 @@ import torch
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
-from app.ml.transformer import FeatureTransformer
+from app.ml.checkpoint_loader import load_model
 from app.models.training import TrainingConfig
 
 
@@ -45,18 +44,7 @@ def evaluate_all_folds(
 
     kfold = KFold(n_splits=config.k_folds, shuffle=True, random_state=42)
 
-    model = FeatureTransformer(
-        n_features=n_features,
-        d_model=config.d_model,
-        n_heads=config.n_heads,
-        n_layers=config.n_layers,
-        dropout=config.dropout,
-    )
-    state_dict = torch.load(
-        checkpoint_dir / "model.pt", map_location="cpu", weights_only=True,
-    )
-    model.load_state_dict(state_dict)
-    model.eval()
+    model = load_model(checkpoint_dir, n_features, config)
 
     fold_results = []
     with torch.no_grad():

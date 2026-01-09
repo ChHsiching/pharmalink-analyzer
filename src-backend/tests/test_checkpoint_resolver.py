@@ -100,3 +100,48 @@ class TestGetFeaturesWithTarget:
         # Verify actual values
         np.testing.assert_array_almost_equal(X[0], [1.0, 2.0, 3.0])
         np.testing.assert_array_almost_equal(y, [10.0, 20.0, 30.0])
+
+
+class TestListCheckpoints:
+    def test_returns_checkpoint_info_for_valid_dir(self, resolver_env):
+        resolver, _, _, _, _ = resolver_env
+        result = resolver.list_checkpoints()
+
+        assert len(result) == 1
+        assert result[0].id == "test-model"
+        assert result[0].dataset_id == "test-dataset"
+
+    def test_skips_dirs_without_config_json(self, resolver_env):
+        resolver, cp_dir, _, _, _ = resolver_env
+        no_config_dir = cp_dir / "no-config-model"
+        no_config_dir.mkdir()
+        (no_config_dir / "model.pt").write_bytes(b"fake-model")
+
+        result = resolver.list_checkpoints()
+
+        assert len(result) == 1
+        assert result[0].id == "test-model"
+
+    def test_returns_empty_for_nonexistent_dir(self, tmp_path):
+        resolver = CheckpointResolver(
+            checkpoint_dir=tmp_path / "no-such-dir",
+            data_loader=DataLoader(),
+        )
+
+        assert resolver.list_checkpoints() == []
+
+    def test_reads_metrics_json_loss(self, resolver_env):
+        resolver, cp_dir, _, _, _ = resolver_env
+        (cp_dir / "test-model" / "metrics.json").write_text('{"final_val_loss": 0.042}')
+
+        result = resolver.list_checkpoints()
+
+        assert result[0].final_loss == 0.042
+
+    def test_default_loss_when_no_metrics(self, resolver_env):
+        resolver, _, _, _, _ = resolver_env
+        # resolver_env creates test-model without metrics.json
+
+        result = resolver.list_checkpoints()
+
+        assert result[0].final_loss == 0.0

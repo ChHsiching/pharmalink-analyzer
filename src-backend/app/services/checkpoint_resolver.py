@@ -1,7 +1,9 @@
+import json
+
 import numpy as np
 from fastapi import HTTPException
 
-from app.models.training import TrainingConfig
+from app.models.training import CheckpointInfo, TrainingConfig
 
 
 class CheckpointResolver:
@@ -41,3 +43,23 @@ class CheckpointResolver:
         X = df[feature_names].to_numpy().astype(np.float32)
         y = df[dataset.target].to_numpy().astype(np.float32)
         return X, y, feature_names
+
+    def list_checkpoints(self) -> list[CheckpointInfo]:
+        if not self._checkpoint_dir.exists():
+            return []
+        result = []
+        for d in sorted(self._checkpoint_dir.iterdir()):
+            if d.is_dir() and (d / "config.json").exists():
+                config = TrainingConfig.model_validate_json((d / "config.json").read_text())
+                final_loss = 0.0
+                metrics_path = d / "metrics.json"
+                if metrics_path.exists():
+                    metrics = json.loads(metrics_path.read_text())
+                    final_loss = metrics.get("final_val_loss", 0.0)
+                result.append(CheckpointInfo(
+                    id=d.name,
+                    dataset_id=config.dataset_id,
+                    config=config,
+                    final_loss=final_loss,
+                ))
+        return result

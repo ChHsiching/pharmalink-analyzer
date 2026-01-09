@@ -4,18 +4,15 @@ import json
 import numpy as np
 import pytest
 import torch
-import torch.nn as nn
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.ml.transformer import FeatureTransformer
-from app.models.training import TrainingConfig
 from app.services import evaluation as evaluation_module
 from app.services.data_loader import DataLoader
 
 
 @pytest.fixture
-def evaluation_env(tmp_path):
+def evaluation_env(tmp_path, make_checkpoint):
     np.random.seed(42)
     torch.manual_seed(42)
 
@@ -37,74 +34,31 @@ def evaluation_env(tmp_path):
     meta, df = dl._load_csv(csv_path)
     dl._datasets[meta.id] = (meta, df)
 
-    feature_names = meta.feature_names
-    X = df[feature_names].to_numpy().astype(np.float32)
+    X = df[meta.feature_names].to_numpy().astype(np.float32)
     y = df["target"].to_numpy().astype(np.float32)
 
-    config = TrainingConfig(
-        dataset_id=meta.id,
-        d_model=16,
-        n_heads=2,
-        n_layers=1,
-        dropout=0.0,
-        k_folds=3,
-        epochs=5,
-    )
-    model = FeatureTransformer(
-        n_features=n_features,
-        d_model=config.d_model,
-        n_heads=config.n_heads,
-        n_layers=config.n_layers,
-        dropout=config.dropout,
-    )
-    X_t = torch.tensor(X)
-    y_t = torch.tensor(y)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    loss_fn = nn.MSELoss()
-    model.train()
-    for _ in range(30):
-        pred, _ = model(X_t)
-        loss = loss_fn(pred, y_t)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    metrics_content = json.dumps({
+        "final_val_loss": 0.1,
+        "history": [
+            {"epoch": 1, "fold": 1, "train_loss": 0.5, "val_loss": 0.6, "r2": 0.5, "status": "training"},
+            {"epoch": 2, "fold": 1, "train_loss": 0.3, "val_loss": 0.4, "r2": 0.7, "status": "training"},
+        ],
+    })
 
-    cp_base = tmp_path / "checkpoints"
-    cp_dir = cp_base / f"{meta.id}_task1"
-    cp_dir.mkdir(parents=True)
-    torch.save(model.state_dict(), cp_dir / "model.pt")
-    (cp_dir / "config.json").write_text(config.model_dump_json())
-    (cp_dir / "metrics.json").write_text(
-        json.dumps(
-            {
-                "final_val_loss": 0.1,
-                "history": [
-                    {
-                        "epoch": 1,
-                        "fold": 1,
-                        "train_loss": 0.5,
-                        "val_loss": 0.6,
-                        "r2": 0.5,
-                        "status": "training",
-                    },
-                    {
-                        "epoch": 2,
-                        "fold": 1,
-                        "train_loss": 0.3,
-                        "val_loss": 0.4,
-                        "r2": 0.7,
-                        "status": "training",
-                    },
-                ],
-            }
-        )
+    env = make_checkpoint(
+        X=X, y=y,
+        n_features=n_features,
+        training_epochs=30,
+        checkpoint_name=f"checkpoints/{meta.id}_task1",
+        dataset_id=meta.id,
+        k_folds=3,
+        metrics_content=metrics_content,
     )
 
     evaluation_module.evaluation_service = evaluation_module.EvaluationService(
-        data_loader=dl,
-        checkpoint_dir=cp_base,
+        data_loader=dl, checkpoint_dir=tmp_path / "checkpoints",
     )
-    return {"checkpoint_id": cp_dir.name}
+    return {"checkpoint_id": env["cp_dir"].name}
 
 
 @pytest.mark.asyncio

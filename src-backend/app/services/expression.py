@@ -2,7 +2,7 @@ import uuid
 from pathlib import Path
 
 import numpy as np
-from fastapi import HTTPException
+from app.exceptions import ExpressionNotFoundError, UndoLimitError
 
 from app.config import CHECKPOINT_DIR
 from app.ml.attention_extractor import extract_attention_weights, extract_top_pairs
@@ -101,7 +101,7 @@ class ExpressionService:
     def simplify(self, expr_id: str) -> ExpressionResponse:
         state = self._states.get(expr_id)
         if state is None:
-            raise HTTPException(status_code=404, detail=f"Expression not found: {expr_id}")
+            raise ExpressionNotFoundError(expr_id)
         simplified = simplify_expr(state.current_sympy)
         state.current_sympy = simplified
         state.current_latex = expr_to_latex(simplified)
@@ -112,7 +112,7 @@ class ExpressionService:
     def optimize(self, expr_id: str) -> ExpressionResponse:
         state = self._states.get(expr_id)
         if state is None:
-            raise HTTPException(status_code=404, detail=f"Expression not found: {expr_id}")
+            raise ExpressionNotFoundError(expr_id)
 
         current_idx = 0
         for i, eq in enumerate(state.pareto_equations):
@@ -134,13 +134,13 @@ class ExpressionService:
     def get_tree(self, expr_id: str) -> ExpressionResponse:
         state = self._states.get(expr_id)
         if state is None:
-            raise HTTPException(status_code=404, detail=f"Expression not found: {expr_id}")
+            raise ExpressionNotFoundError(expr_id)
         return self._to_response(state)
 
     def get_history(self, expr_id: str) -> ExpressionHistoryResponse:
         state = self._states.get(expr_id)
         if state is None:
-            raise HTTPException(status_code=404, detail=f"Expression not found: {expr_id}")
+            raise ExpressionNotFoundError(expr_id)
         entries = [
             ExpressionHistoryEntry(
                 operation=h["operation"],
@@ -159,10 +159,10 @@ class ExpressionService:
     def undo(self, expr_id: str, steps: int = 1) -> ExpressionResponse:
         state = self._states.get(expr_id)
         if state is None:
-            raise HTTPException(status_code=404, detail=f"Expression not found: {expr_id}")
+            raise ExpressionNotFoundError(expr_id)
         target = max(0, min(state.history_index - steps, len(state.history) - 1))
         if target == state.history_index:
-            raise HTTPException(status_code=400, detail="No more history to undo/redo")
+            raise UndoLimitError()
         h = state.history[target]
         state.history_index = target
         state.current_sympy = h["sympy"]

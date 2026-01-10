@@ -6,6 +6,7 @@ import torch
 
 from app.models.training import TrainingConfig
 from app.services import evaluation as evaluation_module
+from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader
 
 
@@ -50,7 +51,7 @@ def eval_service_env(tmp_path, make_checkpoint):
     )
 
     evaluation_module.evaluation_service = evaluation_module.EvaluationService(
-        data_loader=dl, checkpoint_dir=tmp_path / "checkpoints",
+        resolver=CheckpointResolver(tmp_path / "checkpoints", dl),
     )
     return {"checkpoint_id": env["cp_dir"].name}
 
@@ -108,15 +109,16 @@ def test_get_loss_curve_no_history(tmp_path):
     (cp_dir / "model.pt").write_text("")
 
     evaluation_module.evaluation_service = evaluation_module.EvaluationService(
-        checkpoint_dir=cp_base,
+        resolver=CheckpointResolver(cp_base, DataLoader()),
     )
     result = evaluation_module.evaluation_service.get_loss_curve("nohist_m1")
     assert result.folds == []
 
 
-def test_checkpoint_not_found():
+def test_checkpoint_not_found(tmp_path):
     from app.exceptions import CheckpointNotFoundError
-    svc = evaluation_module.EvaluationService()
+    resolver = CheckpointResolver(tmp_path, DataLoader())
+    svc = evaluation_module.EvaluationService(resolver=resolver)
     with pytest.raises(CheckpointNotFoundError) as exc_info:
         svc.get_metrics("nonexistent")
     assert exc_info.value.model_id == "nonexistent"

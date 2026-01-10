@@ -22,10 +22,8 @@ from app.services.data_loader import data_loader as _default_data_loader
 
 
 class EvaluationService:
-    def __init__(self, data_loader=None, checkpoint_dir=None):
-        self._data_loader = data_loader or _default_data_loader
-        self._checkpoint_dir = checkpoint_dir or CHECKPOINT_DIR
-        self._resolver = CheckpointResolver(self._checkpoint_dir, self._data_loader)
+    def __init__(self, resolver: CheckpointResolver):
+        self._resolver = resolver
 
     def _evaluate(self, model_id: str):
         cp_dir, config = self._resolver.resolve(model_id)
@@ -94,4 +92,4 @@ class EvaluationService:
         return LossCurveResponse(model_id=model_id, folds=folds)
 
 
-evaluation_service = EvaluationService()
+evaluation_service = EvaluationService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))

@@ -9,6 +9,7 @@ import pytest
 from app.exceptions import CheckpointNotFoundError, DatasetNotFoundError, ExpressionNotFoundError, UndoLimitError
 
 from app.models.expression import ExpressionHistoryResponse, ExpressionResponse
+from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.expression import ExpressionService
 
 
@@ -104,7 +105,7 @@ def _fake_model():
 
 @pytest.fixture
 def service(mock_loader, checkpoint_dir):
-    return ExpressionService(data_loader=mock_loader, checkpoint_dir=checkpoint_dir)
+    return ExpressionService(resolver=CheckpointResolver(checkpoint_dir, mock_loader))
 
 
 # ---------------------------------------------------------------------------

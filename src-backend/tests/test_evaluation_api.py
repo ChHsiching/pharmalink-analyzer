@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.services import evaluation as evaluation_module
+from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader
 
 
@@ -56,7 +57,7 @@ def evaluation_env(tmp_path, make_checkpoint):
     )
 
     evaluation_module.evaluation_service = evaluation_module.EvaluationService(
-        data_loader=dl, checkpoint_dir=tmp_path / "checkpoints",
+        resolver=CheckpointResolver(tmp_path / "checkpoints", dl),
     )
     return {"checkpoint_id": env["cp_dir"].name}
 

@@ -16,10 +16,8 @@ from app.services.data_loader import data_loader as _default_data_loader
 
 
 class AnalysisService:
-    def __init__(self, data_loader=None, checkpoint_dir=None):
-        self._data_loader = data_loader or _default_data_loader
-        self._checkpoint_dir = checkpoint_dir or CHECKPOINT_DIR
-        self._resolver = CheckpointResolver(self._checkpoint_dir, self._data_loader)
+    def __init__(self, resolver: CheckpointResolver):
+        self._resolver = resolver
 
     def get_attention_matrix(self, model_id: str, top_k: int = 10, threshold: float | None = None):
         cp_dir, config = self._resolver.resolve(model_id)
@@ -78,4 +76,4 @@ class AnalysisService:
         )
 
 
-analysis_service = AnalysisService()
+analysis_service = AnalysisService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))

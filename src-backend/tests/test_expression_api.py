@@ -24,7 +24,7 @@ class MockExpressionService:
 
     def simplify(self, expr_id):
         if expr_id == "not_found":
-            raise _http_404("Expression not found")
+            raise _not_found("not_found")
         return ExpressionResponse(
             expr_id=expr_id,
             model_id="model1",
@@ -36,7 +36,7 @@ class MockExpressionService:
 
     def optimize(self, expr_id):
         if expr_id == "not_found":
-            raise _http_404("Expression not found")
+            raise _not_found("not_found")
         return ExpressionResponse(
             expr_id=expr_id,
             model_id="model1",
@@ -48,7 +48,7 @@ class MockExpressionService:
 
     def get_tree(self, expr_id):
         if expr_id == "not_found":
-            raise _http_404("Expression not found")
+            raise _not_found("not_found")
         return ExpressionResponse(
             expr_id=expr_id,
             model_id="model1",
@@ -67,7 +67,7 @@ class MockExpressionService:
 
     def get_history(self, expr_id):
         if expr_id == "not_found":
-            raise _http_404("Expression not found")
+            raise _not_found("not_found")
         return ExpressionHistoryResponse(
             expr_id=expr_id,
             current_index=1,
@@ -83,7 +83,7 @@ class MockExpressionService:
 
     def undo(self, expr_id, steps=1):
         if expr_id == "not_found":
-            raise _http_404("Expression not found")
+            raise _not_found("not_found")
         return ExpressionResponse(
             expr_id=expr_id,
             model_id="model1",
@@ -94,10 +94,10 @@ class MockExpressionService:
         )
 
 
-def _http_404(detail: str):
-    from fastapi import HTTPException
+def _not_found(expr_id: str):
+    from app.exceptions import ExpressionNotFoundError
 
-    return HTTPException(status_code=404, detail=detail)
+    raise ExpressionNotFoundError(expr_id)
 
 
 @pytest.fixture

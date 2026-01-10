@@ -115,8 +115,8 @@ def test_get_loss_curve_no_history(tmp_path):
 
 
 def test_checkpoint_not_found():
-    from fastapi import HTTPException
+    from app.exceptions import CheckpointNotFoundError
     svc = evaluation_module.EvaluationService()
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(CheckpointNotFoundError) as exc_info:
         svc.get_metrics("nonexistent")
-    assert exc_info.value.status_code == 404
+    assert exc_info.value.model_id == "nonexistent"

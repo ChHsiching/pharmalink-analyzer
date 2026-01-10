@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from fastapi import HTTPException
+from app.exceptions import CheckpointNotFoundError, DatasetNotFoundError, ExpressionNotFoundError, UndoLimitError
 
 from app.models.expression import ExpressionHistoryResponse, ExpressionResponse
 from app.services.expression import ExpressionService
@@ -141,9 +141,8 @@ class TestGenerate:
         assert result.r2_score == 0.95
 
     def test_generate_raises_404_on_missing_checkpoint(self, service, checkpoint_dir):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(CheckpointNotFoundError):
             service.generate("nonexistent")
-        assert exc_info.value.status_code == 404
 
     @patch("app.services.expression.extract_attention_weights")
     def test_generate_raises_404_on_missing_dataset(
@@ -152,9 +151,8 @@ class TestGenerate:
         _write_checkpoint(checkpoint_dir)
         mock_loader.get_dataset.return_value = None
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(DatasetNotFoundError):
             service.generate("model-abc")
-        assert exc_info.value.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -175,9 +173,8 @@ class TestSimplify:
         pass
 
     def test_simplify_unknown_expr_raises_404(self, service):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ExpressionNotFoundError):
             service.simplify("expr_nonexistent")
-        assert exc_info.value.status_code == 404
 
     @patch("app.services.expression.run_symbolic_regression")
     @patch("app.services.expression.extract_pareto_equations")
@@ -212,9 +209,8 @@ class TestSimplify:
 
 class TestOptimize:
     def test_optimize_unknown_expr_raises_404(self, service):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ExpressionNotFoundError):
             service.optimize("expr_nonexistent")
-        assert exc_info.value.status_code == 404
 
     @patch("app.services.expression.run_symbolic_regression")
     @patch("app.services.expression.extract_pareto_equations")
@@ -295,9 +291,8 @@ class TestOptimize:
 
 class TestGetTree:
     def test_get_tree_unknown_expr_raises_404(self, service):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ExpressionNotFoundError):
             service.get_tree("expr_nonexistent")
-        assert exc_info.value.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -306,9 +301,8 @@ class TestGetTree:
 
 class TestHistory:
     def test_get_history_unknown_expr_raises_404(self, service):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ExpressionNotFoundError):
             service.get_history("expr_nonexistent")
-        assert exc_info.value.status_code == 404
 
     @patch("app.services.expression.run_symbolic_regression")
     @patch("app.services.expression.extract_pareto_equations")
@@ -344,9 +338,8 @@ class TestHistory:
 
 class TestUndo:
     def test_undo_unknown_expr_raises_404(self, service):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ExpressionNotFoundError):
             service.undo("expr_nonexistent")
-        assert exc_info.value.status_code == 404
 
     @patch("app.services.expression.run_symbolic_regression")
     @patch("app.services.expression.extract_pareto_equations")
@@ -398,6 +391,5 @@ class TestUndo:
         service.generate("model-abc")
         # At index 0, can't undo further
 
-        with pytest.raises(HTTPException) as exc_info:
-            service.undo("expr_unknown")  # wrong ID still 404
-        assert exc_info.value.status_code == 404
+        with pytest.raises(ExpressionNotFoundError):
+            service.undo("expr_unknown")  # wrong ID still raises

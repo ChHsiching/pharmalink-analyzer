@@ -2,9 +2,9 @@ import json
 
 import numpy as np
 import pytest
-from fastapi import HTTPException
 from pathlib import Path
 
+from app.exceptions import CheckpointNotFoundError, DatasetNotFoundError
 from app.models.training import TrainingConfig
 from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader
@@ -44,24 +44,21 @@ class TestResolve:
         assert result_config.dataset_id == expected_config.dataset_id
         assert result_dir.is_dir()
 
-    def test_raises_404_for_missing_checkpoint(self, resolver_env):
+    def test_raises_for_missing_checkpoint(self, resolver_env):
         resolver, _, _, _, _ = resolver_env
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(CheckpointNotFoundError) as exc_info:
             resolver.resolve("nonexistent-model")
-        assert exc_info.value.status_code == 404
-        assert "Checkpoint not found" in exc_info.value.detail
+        assert exc_info.value.model_id == "nonexistent-model"
 
-    def test_raises_404_for_missing_config(self, resolver_env):
+    def test_raises_for_missing_config(self, resolver_env):
         resolver, cp_dir, _, _, _ = resolver_env
-        # Create a checkpoint dir without config.json
         no_config_dir = cp_dir / "no-config-model"
         no_config_dir.mkdir()
         (no_config_dir / "model.pt").write_bytes(b"fake-model")
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(CheckpointNotFoundError) as exc_info:
             resolver.resolve("no-config-model")
-        assert exc_info.value.status_code == 404
-        assert "Config not found" in exc_info.value.detail
+        assert exc_info.value.model_id == "no-config-model"
 
 
 class TestGetFeatures:
@@ -74,12 +71,11 @@ class TestGetFeatures:
         assert X.shape == (3, 3)  # 3 samples, 3 features (QA, CGA, CA)
         assert feature_names == ["QA", "CGA", "CA"]
 
-    def test_raises_404_for_missing_dataset(self, resolver_env):
+    def test_raises_for_missing_dataset(self, resolver_env):
         resolver, _, _, _, _ = resolver_env
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(DatasetNotFoundError) as exc_info:
             resolver.get_features("nonexistent-dataset")
-        assert exc_info.value.status_code == 404
-        assert "Dataset not found" in exc_info.value.detail
+        assert exc_info.value.dataset_id == "nonexistent-dataset"
 
 
 class TestGetFeaturesWithTarget:

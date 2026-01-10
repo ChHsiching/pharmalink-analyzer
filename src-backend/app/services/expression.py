@@ -1,5 +1,4 @@
 import uuid
-from pathlib import Path
 
 import numpy as np
 from app.exceptions import ExpressionNotFoundError, UndoLimitError
@@ -41,11 +40,9 @@ class _ExpressionState:
 
 
 class ExpressionService:
-    def __init__(self, data_loader=None, checkpoint_dir=None):
-        self._data_loader = data_loader or _default_data_loader
-        self._checkpoint_dir = Path(checkpoint_dir) if checkpoint_dir else CHECKPOINT_DIR
+    def __init__(self, resolver: CheckpointResolver):
+        self._resolver = resolver
         self._states: dict[str, _ExpressionState] = {}
-        self._resolver = CheckpointResolver(self._checkpoint_dir, self._data_loader)
 
     def _to_response(self, state: _ExpressionState) -> ExpressionResponse:
         return ExpressionResponse(
@@ -172,4 +169,4 @@ class ExpressionService:
         return self._to_response(state)
 
 
-expression_service = ExpressionService()
+expression_service = ExpressionService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))

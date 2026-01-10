@@ -1,4 +1,7 @@
 import { reactive, computed } from "vue";
+import { apiClient } from "./useApi";
+import type { DatasetMeta } from "@/types/dataset";
+import type { CheckpointInfo } from "@/types/training";
 
 export type TabName =
   | "data-import"
@@ -45,8 +48,23 @@ export function useWorkflow() {
     state.hasCheckpoint = true;
   }
 
-  function resetDownstream() {
-    state.hasCheckpoint = false;
+  async function init() {
+    const results = await Promise.allSettled([
+      apiClient.get<DatasetMeta[]>("/datasets"),
+      apiClient.get<CheckpointInfo[]>("/models/checkpoints"),
+    ]);
+    if (
+      results[0].status === "fulfilled" &&
+      results[0].value.data.length > 0
+    ) {
+      state.datasetsAvailable = true;
+    }
+    if (
+      results[1].status === "fulfilled" &&
+      results[1].value.data.length > 0
+    ) {
+      state.hasCheckpoint = true;
+    }
   }
 
   return {
@@ -54,6 +72,6 @@ export function useWorkflow() {
     tabEnabled,
     markDatasetsAvailable,
     markHasCheckpoint,
-    resetDownstream,
+    init,
   };
 }

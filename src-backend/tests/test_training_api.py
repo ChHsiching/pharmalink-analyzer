@@ -6,11 +6,11 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-import app.api.training as _training_api_module
 from app.main import app
+from app.dependencies import get_checkpoint_resolver, get_training_service
 from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader, data_loader
-from app.services.training import training_service
+from app.services.training import TrainingService
 
 
 @pytest.fixture
@@ -32,19 +32,23 @@ async def client(csv_dir, tmp_path):
     for k, v in dl._datasets.items():
         data_loader._datasets[k] = v
 
-    training_service.__init__(checkpoint_dir=tmp_path / "ckpts")
-    training_service._status = "idle"
-    training_service._progress = []
-    training_service._data_loader = data_loader
+    test_training = TrainingService(checkpoint_dir=tmp_path / "ckpts", data_loader=data_loader)
+    test_training._status = "idle"
+    test_training._progress = []
 
-    # Patch the resolver in the training API module to use test checkpoint dir
-    _training_api_module._resolver = CheckpointResolver(
+    test_resolver = CheckpointResolver(
         checkpoint_dir=tmp_path / "ckpts", data_loader=data_loader,
     )
+
+    app.dependency_overrides[get_training_service] = lambda: test_training
+    app.dependency_overrides[get_checkpoint_resolver] = lambda: test_resolver
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+    del app.dependency_overrides[get_training_service]
+    del app.dependency_overrides[get_checkpoint_resolver]
 
 
 @pytest.mark.asyncio
@@ -66,7 +70,8 @@ async def test_start_training_success(client):
         if status_resp.json()["status"] != "running":
             break
 
-    training_service.request_stop()
+    training_svc = app.dependency_overrides[get_training_service]()
+    training_svc.request_stop()
 
 
 @pytest.mark.asyncio

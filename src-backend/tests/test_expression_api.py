@@ -2,13 +2,13 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.dependencies import get_expression_service
 from app.models.expression import (
     ExpressionHistoryEntry,
     ExpressionHistoryResponse,
     ExpressionNode,
     ExpressionResponse,
 )
-from app.services import expression as expression_module
 
 
 class MockExpressionService:
@@ -102,10 +102,9 @@ def _not_found(expr_id: str):
 
 @pytest.fixture
 def mock_service():
-    original = expression_module.expression_service
-    expression_module.expression_service = MockExpressionService()
+    app.dependency_overrides[get_expression_service] = lambda: MockExpressionService()
     yield
-    expression_module.expression_service = original
+    del app.dependency_overrides[get_expression_service]
 
 
 @pytest.mark.asyncio

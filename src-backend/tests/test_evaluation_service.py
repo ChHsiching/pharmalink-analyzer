@@ -1,11 +1,10 @@
-# src-backend/tests/test_evaluation_service.py
 import json
 import numpy as np
 import pytest
 import torch
 
 from app.models.training import TrainingConfig
-from app.services import evaluation as evaluation_module
+from app.services.evaluation import EvaluationService
 from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader
 
@@ -50,14 +49,14 @@ def eval_service_env(tmp_path, make_checkpoint):
         metrics_content=metrics_content,
     )
 
-    evaluation_module.evaluation_service = evaluation_module.EvaluationService(
+    svc = EvaluationService(
         resolver=CheckpointResolver(tmp_path / "checkpoints", dl),
     )
-    return {"checkpoint_id": env["cp_dir"].name}
+    return {"checkpoint_id": env["cp_dir"].name, "service": svc}
 
 
 def test_get_metrics(eval_service_env):
-    svc = evaluation_module.evaluation_service
+    svc = eval_service_env["service"]
     result = svc.get_metrics(eval_service_env["checkpoint_id"])
     assert result.model_id == eval_service_env["checkpoint_id"]
     assert len(result.folds) == 3
@@ -68,7 +67,7 @@ def test_get_metrics(eval_service_env):
 
 
 def test_get_predictions(eval_service_env):
-    svc = evaluation_module.evaluation_service
+    svc = eval_service_env["service"]
     result = svc.get_predictions(eval_service_env["checkpoint_id"])
     assert result.model_id == eval_service_env["checkpoint_id"]
     assert len(result.predictions) > 0
@@ -78,7 +77,7 @@ def test_get_predictions(eval_service_env):
 
 
 def test_get_residuals(eval_service_env):
-    svc = evaluation_module.evaluation_service
+    svc = eval_service_env["service"]
     result = svc.get_residuals(eval_service_env["checkpoint_id"])
     assert result.model_id == eval_service_env["checkpoint_id"]
     assert len(result.residuals) > 0
@@ -90,7 +89,7 @@ def test_get_residuals(eval_service_env):
 
 
 def test_get_loss_curve(eval_service_env):
-    svc = evaluation_module.evaluation_service
+    svc = eval_service_env["service"]
     result = svc.get_loss_curve(eval_service_env["checkpoint_id"])
     assert result.model_id == eval_service_env["checkpoint_id"]
     assert len(result.folds) == 2
@@ -108,17 +107,15 @@ def test_get_loss_curve_no_history(tmp_path):
     (cp_dir / "metrics.json").write_text('{"final_val_loss": 0.1}')
     (cp_dir / "model.pt").write_text("")
 
-    evaluation_module.evaluation_service = evaluation_module.EvaluationService(
-        resolver=CheckpointResolver(cp_base, DataLoader()),
-    )
-    result = evaluation_module.evaluation_service.get_loss_curve("nohist_m1")
+    svc = EvaluationService(resolver=CheckpointResolver(cp_base, DataLoader()))
+    result = svc.get_loss_curve("nohist_m1")
     assert result.folds == []
 
 
 def test_checkpoint_not_found(tmp_path):
     from app.exceptions import CheckpointNotFoundError
     resolver = CheckpointResolver(tmp_path, DataLoader())
-    svc = evaluation_module.EvaluationService(resolver=resolver)
+    svc = EvaluationService(resolver=resolver)
     with pytest.raises(CheckpointNotFoundError) as exc_info:
         svc.get_metrics("nonexistent")
     assert exc_info.value.model_id == "nonexistent"

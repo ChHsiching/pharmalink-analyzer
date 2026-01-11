@@ -1,4 +1,3 @@
-# tests/test_evaluation_api.py
 import json
 
 import numpy as np
@@ -7,7 +6,8 @@ import torch
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.services import evaluation as evaluation_module
+from app.dependencies import get_evaluation_service
+from app.services.evaluation import EvaluationService
 from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader
 
@@ -56,15 +56,16 @@ def evaluation_env(tmp_path, make_checkpoint):
         metrics_content=metrics_content,
     )
 
-    evaluation_module.evaluation_service = evaluation_module.EvaluationService(
+    test_service = EvaluationService(
         resolver=CheckpointResolver(tmp_path / "checkpoints", dl),
     )
-    return {"checkpoint_id": env["cp_dir"].name}
+    app.dependency_overrides[get_evaluation_service] = lambda: test_service
+    yield {"checkpoint_id": env["cp_dir"].name}
+    del app.dependency_overrides[get_evaluation_service]
 
 
 @pytest.mark.asyncio
 async def test_metrics_not_found():
-    """Tracer bullet: 404 response for nonexistent checkpoint."""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -74,7 +75,6 @@ async def test_metrics_not_found():
 
 @pytest.mark.asyncio
 async def test_get_loss_curve(evaluation_env):
-    """Loss curve reads from metrics.json history."""
     info = evaluation_env
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -89,7 +89,6 @@ async def test_get_loss_curve(evaluation_env):
 
 @pytest.mark.asyncio
 async def test_get_metrics(evaluation_env):
-    """Metrics endpoint returns fold metrics and aggregate statistics."""
     info = evaluation_env
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -105,7 +104,6 @@ async def test_get_metrics(evaluation_env):
 
 @pytest.mark.asyncio
 async def test_get_predictions(evaluation_env):
-    """Predictions endpoint returns actual vs predicted pairs."""
     info = evaluation_env
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -121,7 +119,6 @@ async def test_get_predictions(evaluation_env):
 
 @pytest.mark.asyncio
 async def test_get_residuals(evaluation_env):
-    """Residuals endpoint returns residuals, bins, mean, and std."""
     info = evaluation_env
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

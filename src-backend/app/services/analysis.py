@@ -74,6 +74,3 @@ class AnalysisService:
             edges=edges,
             threshold=threshold,
         )
-
-
-analysis_service = AnalysisService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))

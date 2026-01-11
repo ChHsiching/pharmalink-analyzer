@@ -26,3 +26,6 @@ Thumbs.db
 
 # Session state
 .remember/
+
+# Custom (Modification Prohibited)
+docs/

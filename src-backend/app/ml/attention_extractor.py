@@ -10,10 +10,8 @@ from app.models.training import TrainingConfig
 def extract_attention_weights(
     checkpoint_dir: Path,
     features: np.ndarray,
+    config: TrainingConfig,
 ) -> np.ndarray:
-    config = TrainingConfig.model_validate_json(
-        (checkpoint_dir / "config.json").read_text()
-    )
     model = load_model(checkpoint_dir, features.shape[1], config)
 
     with torch.no_grad():

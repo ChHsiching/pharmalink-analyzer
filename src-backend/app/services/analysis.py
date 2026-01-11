@@ -22,7 +22,7 @@ class AnalysisService:
     def get_attention_matrix(self, model_id: str, top_k: int = 10, threshold: float | None = None):
         cp_dir, config = self._resolver.resolve(model_id)
         X, feature_names = self._resolver.get_features(config.dataset_id)
-        matrix = extract_attention_weights(cp_dir, X)
+        matrix = extract_attention_weights(cp_dir, X, config)
         pairs_raw, actual_threshold = extract_top_pairs(matrix, feature_names, top_k, threshold)
         pairs = [AttentionPair(**p) for p in pairs_raw]
         return AttentionMatrixResponse(
@@ -36,7 +36,7 @@ class AnalysisService:
     def get_heatmap_data(self, model_id: str):
         cp_dir, config = self._resolver.resolve(model_id)
         X, feature_names = self._resolver.get_features(config.dataset_id)
-        matrix = extract_attention_weights(cp_dir, X)
+        matrix = extract_attention_weights(cp_dir, X, config)
         return HeatmapDataResponse(
             model_id=model_id,
             feature_names=feature_names,
@@ -48,7 +48,7 @@ class AnalysisService:
     def get_network_graph(self, model_id: str, threshold: float | None = None):
         cp_dir, config = self._resolver.resolve(model_id)
         X, feature_names = self._resolver.get_features(config.dataset_id)
-        matrix = extract_attention_weights(cp_dir, X)
+        matrix = extract_attention_weights(cp_dir, X, config)
         n = len(feature_names)
 
         if threshold is None:

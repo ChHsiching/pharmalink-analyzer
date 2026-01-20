@@ -44,11 +44,14 @@ class PySRResultAdapter:
         """Locate the DataFrame row for the model's chosen best equation.
 
         * Old PySR (``pick`` column present): use the marked row.
-        * New PySR (no ``pick`` column): select the row with highest ``score``,
-          matching what ``model_selection="best"`` picks internally.
+        * New PySR (no ``pick`` column): filter to equations within 1.5x of
+          minimum loss, then pick the highest ``score`` — matching PySR's
+          ``model_selection="best"`` implementation.
         """
         if "pick" in self._eq.columns:
             idx = self._eq.query("pick == True").index[0]
         else:
-            idx = self._eq["score"].idxmax()
+            threshold = 1.5 * self._eq["loss"].min()
+            filtered = self._eq[self._eq["loss"] <= threshold]
+            idx = filtered["score"].idxmax()
         return self._eq.iloc[idx]

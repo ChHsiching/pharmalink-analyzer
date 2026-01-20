@@ -1,5 +1,4 @@
 """Tests for PySRResultAdapter — validates schema isolation."""
-import numpy as np
 import pandas as pd
 import sympy
 
@@ -54,6 +53,28 @@ class TestGetBestEquation:
 
         assert result["complexity"] == 3
         assert result["loss"] == 0.2
+
+    def test_loss_threshold_filters_high_loss_equations(self):
+        """Adapter filters out equations with loss > 1.5x min loss before scoring."""
+        x0, x1 = sympy.symbols("x0 x1")
+        model = type("MockPySR", (), {
+            "equations_": pd.DataFrame({
+                "complexity": [1, 3, 7],
+                "loss": [0.1, 0.15, 1.0],
+                "equation": ["x0", "x0+x1", "x0*x1"],
+                "score": [0.5, 1.0, 3.0],
+            }),
+        })()
+        model.sympy = lambda index=None: x0 * x1
+        model.latex = lambda index=None, precision=3: "x_{0} x_{1}"
+
+        adapter = PySRResultAdapter(model)
+        result = adapter.get_best_equation()
+
+        # threshold = 1.5 * 0.1 = 0.15; row 2 (loss=1.0) filtered out
+        # among rows 0 and 1, row 1 has score=1.0 > row 0's 0.5
+        assert result["complexity"] == 3
+        assert result["loss"] == 0.15
 
 
 class TestGetParetoEquations:

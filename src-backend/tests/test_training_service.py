@@ -128,3 +128,40 @@ async def test_dataset_not_found_raises(tmp_path):
     config = TrainingConfig(dataset_id="nonexistent")
     with pytest.raises(ValueError, match="not found"):
         await svc.start_training(config)
+
+
+@pytest.mark.asyncio
+async def test_start_training_saves_scaler_params(service, tmp_path):
+    config = TrainingConfig(
+        dataset_id="fruit-test-tc",
+        d_model=32, n_heads=2, n_layers=1,
+        epochs=3, k_folds=2,
+        dropout=0.0,
+        augmentation=AugmentationConfig(enabled=False),
+    )
+    await service.start_training(config)
+
+    for _ in range(60):
+        await asyncio.sleep(0.5)
+        if service.get_status().status != "running":
+            break
+
+    assert service.get_status().status == "completed"
+
+    ckpt_dir = tmp_path / "ckpts"
+    checkpoints = [
+        d for d in ckpt_dir.iterdir()
+        if d.is_dir() and (d / "config.json").exists()
+    ]
+    assert len(checkpoints) == 1
+
+    scaler_path = checkpoints[0] / "scaler_params.json"
+    assert scaler_path.exists(), "scaler_params.json must exist in checkpoint"
+
+    import json
+    scaler_data = json.loads(scaler_path.read_text())
+    assert "mean" in scaler_data
+    assert "scale" in scaler_data
+    assert len(scaler_data["mean"]) == 5
+    assert len(scaler_data["scale"]) == 5
+    assert all(s > 0 for s in scaler_data["scale"])

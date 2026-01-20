@@ -17,6 +17,8 @@ class TrainingConfig(BaseModel):
     weight_decay: float = 1e-4
     epochs: int = 100
     k_folds: int = 5
+    k_fold_shuffle: bool = True
+    k_fold_seed: int = 42
     early_stopping_patience: int = 20
     augmentation: AugmentationConfig = AugmentationConfig()
 

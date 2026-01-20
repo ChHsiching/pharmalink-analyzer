@@ -1,6 +1,10 @@
-import torch
+import json
 
-from app.ml.checkpoint_loader import load_model
+import numpy as np
+import torch
+import pytest
+
+from app.ml.checkpoint_loader import load_model, load_scaler_params, save_scaler_params
 from app.ml.transformer import FeatureTransformer
 from app.models.training import TrainingConfig
 
@@ -60,3 +64,40 @@ def test_load_model_is_eval_mode(tmp_path):
     )
 
     assert not loaded.training
+
+
+class TestSaveScalerParams:
+    def test_creates_json_file(self, tmp_path):
+        mean = np.array([1.0, 2.0, 3.0])
+        scale = np.array([0.5, 1.0, 1.5])
+        path = tmp_path / "scaler_params.json"
+        save_scaler_params(path, mean, scale)
+        assert path.exists()
+        data = json.loads(path.read_text())
+        assert "mean" in data
+        assert "scale" in data
+
+    def test_values_round_trip(self, tmp_path):
+        mean = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        scale = np.array([0.5, 1.0, 1.5], dtype=np.float32)
+        path = tmp_path / "scaler_params.json"
+        save_scaler_params(path, mean, scale)
+        loaded_mean, loaded_scale = load_scaler_params(path)
+        np.testing.assert_allclose(loaded_mean, mean, rtol=1e-5)
+        np.testing.assert_allclose(loaded_scale, scale, rtol=1e-5)
+
+
+class TestLoadScalerParams:
+    def test_returns_numpy_arrays(self, tmp_path):
+        data = {"mean": [1.0, 2.0], "scale": [0.5, 1.0]}
+        path = tmp_path / "scaler_params.json"
+        path.write_text(json.dumps(data))
+        mean, scale = load_scaler_params(path)
+        assert isinstance(mean, np.ndarray)
+        assert isinstance(scale, np.ndarray)
+        assert mean.dtype == np.float32
+        assert scale.dtype == np.float32
+
+    def test_raises_on_missing_file(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            load_scaler_params(tmp_path / "nonexistent.json")

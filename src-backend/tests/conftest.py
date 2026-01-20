@@ -2,7 +2,9 @@ import numpy as np
 import pytest
 import torch
 import torch.nn as nn
+from sklearn.preprocessing import StandardScaler
 
+from app.ml.checkpoint_loader import save_scaler_params
 from app.ml.transformer import FeatureTransformer
 from app.models.training import TrainingConfig
 
@@ -37,12 +39,15 @@ def make_checkpoint(tmp_path):
             k_folds=k_folds, epochs=training_epochs,
         )
 
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X).astype(np.float32)
+
         model = FeatureTransformer(
             n_features=actual_n_features,
             d_model=config.d_model, n_heads=config.n_heads,
             n_layers=config.n_layers, dropout=config.dropout,
         )
-        X_t = torch.tensor(X)
+        X_t = torch.tensor(X_scaled)
         y_t = torch.tensor(y)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
         loss_fn = nn.MSELoss()
@@ -59,6 +64,9 @@ def make_checkpoint(tmp_path):
         torch.save(model.state_dict(), cp_dir / "model.pt")
         (cp_dir / "config.json").write_text(config.model_dump_json())
         (cp_dir / "metrics.json").write_text(metrics_content)
+        save_scaler_params(
+            cp_dir / "scaler_params.json", scaler.mean_, scaler.scale_,
+        )
 
         return {
             "cp_dir": cp_dir,

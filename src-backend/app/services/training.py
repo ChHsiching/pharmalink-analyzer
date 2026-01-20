@@ -11,6 +11,7 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
 from app.config import CHECKPOINT_DIR
+from app.ml.checkpoint_loader import save_scaler_params
 from app.models.training import (
     TrainingConfig, TrainingProgress, TrainingStatusResponse,
 )
@@ -100,23 +101,25 @@ class TrainingService:
         n_features: int,
     ):
         try:
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X).astype(np.float32)
-
             kfold = KFold(
-                n_splits=config.k_folds, shuffle=True, random_state=42
+                n_splits=config.k_folds,
+                shuffle=config.k_fold_shuffle,
+                random_state=config.k_fold_seed,
             )
             best_state = None
             best_loss = float("inf")
+            best_scaler = None
 
             for fold_idx, (train_idx, val_idx) in enumerate(
-                kfold.split(X_scaled)
+                kfold.split(X)
             ):
                 if self._stop_requested:
                     self._finish("stopped")
                     return
 
-                X_train, X_val = X_scaled[train_idx], X_scaled[val_idx]
+                scaler = StandardScaler()
+                X_train = scaler.fit_transform(X[train_idx]).astype(np.float32)
+                X_val = scaler.transform(X[val_idx]).astype(np.float32)
                 y_train, y_val = y[train_idx], y[val_idx]
 
                 if config.augmentation.enabled:
@@ -187,22 +190,32 @@ class TrainingService:
                 if best_fold_loss < best_loss:
                     best_loss = best_fold_loss
                     best_state = {k: v.clone() for k, v in model.state_dict().items()}
+                    best_scaler = scaler
 
             if not self._stop_requested:
                 if best_state:
-                    self._save_checkpoint(config, best_state, best_loss)
+                    self._save_checkpoint(config, best_state, best_loss, best_scaler)
                 self._finish("completed")
 
         except Exception as e:
             self._finish("error", str(e))
 
-    def _save_checkpoint(self, config: TrainingConfig, model_state: dict, val_loss: float):
+    def _save_checkpoint(
+        self,
+        config: TrainingConfig,
+        model_state: dict,
+        val_loss: float,
+        scaler: StandardScaler,
+    ):
         self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
         ckpt_id = f"{config.dataset_id}_{self._task_id}"
         ckpt_path = self._checkpoint_dir / ckpt_id
         ckpt_path.mkdir(exist_ok=True)
         torch.save(model_state, ckpt_path / "model.pt")
         (ckpt_path / "config.json").write_text(config.model_dump_json())
+        save_scaler_params(
+            ckpt_path / "scaler_params.json", scaler.mean_, scaler.scale_,
+        )
         metrics_data: dict = {"final_val_loss": val_loss}
         if self._progress:
             metrics_data["history"] = [p.model_dump() for p in self._progress]
@@ -215,5 +228,5 @@ class TrainingService:
             msg["error"] = error
         if self._progress_queue and self._loop:
             asyncio.run_coroutine_threadsafe(
-                self._progress_queue.put(msg), self._loop
+                self._progress_queue.put(msg), self._loop,
             )

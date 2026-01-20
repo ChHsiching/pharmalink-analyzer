@@ -100,3 +100,52 @@ class TestEvaluateAllFolds:
         for r in results:
             for actual, pred, res in zip(r["actuals"], r["predictions"], r["residuals"]):
                 assert abs(res - (actual - pred)) < 1e-5
+
+import torch
+from app.ml.checkpoint_loader import save_scaler_params
+
+
+class TestEvaluateUsesSavedScaler:
+    def test_loads_scaler_from_checkpoint(self, tmp_path):
+        """Evaluator calls load_scaler_params -- never fit_transform."""
+        from unittest.mock import patch
+
+        from app.ml.evaluator import evaluate_all_folds
+        from app.ml.transformer import FeatureTransformer
+        from app.models.training import TrainingConfig
+
+        rng = np.random.default_rng(42)
+        n_features = 5
+        X = rng.standard_normal((30, n_features)).astype(np.float32)
+        y = rng.standard_normal(30).astype(np.float32)
+
+        saved_mean = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32)
+        saved_scale = np.array([0.5, 1.0, 1.5, 2.0, 2.5], dtype=np.float32)
+
+        config = TrainingConfig(
+            dataset_id="test", d_model=16, n_heads=2, n_layers=1,
+            k_folds=3,
+        )
+        cp_dir = tmp_path / "test_ckpt"
+        cp_dir.mkdir()
+        save_scaler_params(cp_dir / "scaler_params.json", saved_mean, saved_scale)
+
+        model = FeatureTransformer(
+            n_features=n_features, d_model=16, n_heads=2,
+            n_layers=1, dropout=0.0,
+        )
+        torch.save(model.state_dict(), cp_dir / "model.pt")
+        (cp_dir / "config.json").write_text(config.model_dump_json())
+        (cp_dir / "metrics.json").write_text('{"final_val_loss": 0.1}')
+
+        with patch(
+            "app.ml.evaluator.load_scaler_params",
+            wraps=__import__(
+                "app.ml.checkpoint_loader", fromlist=["load_scaler_params"]
+            ).load_scaler_params,
+        ) as mock_load:
+            results = evaluate_all_folds(cp_dir, X, y, n_features, config)
+            mock_load.assert_called_once()
+            assert "scaler_params.json" in str(mock_load.call_args[0][0])
+
+        assert len(results) == 3

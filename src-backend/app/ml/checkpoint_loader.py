@@ -1,5 +1,7 @@
+import json
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from app.ml.transformer import FeatureTransformer
@@ -26,3 +28,24 @@ def load_model(
     model.load_state_dict(state_dict)
     model.eval()
     return model
+
+
+def save_scaler_params(path: Path, mean: np.ndarray, scale: np.ndarray) -> None:
+    """Persist StandardScaler mean_ and scale_ to JSON."""
+    data = {
+        "mean": np.asarray(mean).astype(np.float64).tolist(),
+        "scale": np.asarray(scale).astype(np.float64).tolist(),
+    }
+    path.write_text(json.dumps(data))
+
+
+def load_scaler_params(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Load StandardScaler mean_ and scale_ from JSON.
+
+    Returns (mean, scale) as float32 numpy arrays.
+    """
+    data = json.loads(path.read_text())
+    return (
+        np.array(data["mean"], dtype=np.float32),
+        np.array(data["scale"], dtype=np.float32),
+    )

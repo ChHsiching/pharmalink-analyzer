@@ -1,6 +1,7 @@
 import numpy as np
 
 from app.exceptions import SymbolicRegressionError
+from app.ml.pysr_adapter import PySRResultAdapter
 
 
 def generate_interaction_features(
@@ -66,33 +67,10 @@ def run_symbolic_regression(X, y, feature_names, niterations=20):
 
 
 def extract_best_equation(model) -> dict:
-    """Extract the best equation from a fitted PySR model.
-
-    Uses model.sympy() and model.latex() which respect model_selection
-    strategy, then finds the matching row by index.
-    """
-    best_idx = 0
-    if "pick" in model.equations_.columns:
-        best_idx = model.equations_.query("pick == True").index[0]
-    best_row = model.equations_.iloc[best_idx]
-    return {
-        "sympy_expr": model.sympy(),
-        "latex": model.latex(),
-        "complexity": int(best_row["complexity"]),
-        "loss": float(best_row["loss"]),
-    }
+    """Extract the best equation from a fitted PySR model."""
+    return PySRResultAdapter(model).get_best_equation()
 
 
 def extract_pareto_equations(model) -> list[dict]:
     """Extract all Pareto-front equations from a fitted PySR model."""
-    results = []
-    for idx in range(len(model.equations_)):
-        row = model.equations_.iloc[idx]
-        results.append({
-            "index": idx,
-            "latex": model.latex(index=idx),
-            "complexity": int(row["complexity"]),
-            "loss": float(row["loss"]),
-            "sympy_expr": model.sympy(index=idx),
-        })
-    return results
+    return PySRResultAdapter(model).get_pareto_equations()

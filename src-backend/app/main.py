@@ -95,7 +95,7 @@ async def training_websocket(websocket: WebSocket):
     training_service = get_training_service()
     await websocket.accept()
     queue = asyncio.Queue()
-    training_service.set_progress_queue(queue)
+    training_service.add_progress_queue(queue)
     try:
         while True:
             try:
@@ -110,4 +110,4 @@ async def training_websocket(websocket: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        training_service.clear_progress_queue()
+        training_service.remove_progress_queue(queue)

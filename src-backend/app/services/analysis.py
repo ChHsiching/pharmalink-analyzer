@@ -46,31 +46,22 @@ class AnalysisService:
 
     def get_network_graph(self, model_id: str, threshold_percentile: int | None = None):
         matrix, feature_names = self._extract_attention(model_id)
-        n = len(feature_names)
 
         if threshold_percentile is None:
             threshold_percentile = 50
 
-        pair_weights = [float((matrix[i][j] + matrix[j][i]) / 2)
-                        for i in range(n) for j in range(i + 1, n)]
-        abs_threshold = float(np.percentile(pair_weights, threshold_percentile))
+        all_pairs_count = len(feature_names) * (len(feature_names) - 1) // 2
+        pairs_raw, returned_pct = extract_top_pairs(
+            matrix, feature_names, top_k=all_pairs_count,
+            threshold_percentile=threshold_percentile,
+        )
 
         nodes = [NetworkNode(id=name, name=name) for name in feature_names]
-        edges = []
-        for i in range(n):
-            for j in range(i + 1, n):
-                weight = float((matrix[i][j] + matrix[j][i]) / 2)
-                classification = "synergistic" if weight >= abs_threshold else "antagonistic"
-                edges.append(NetworkEdge(
-                    source=feature_names[i],
-                    target=feature_names[j],
-                    weight=weight,
-                    classification=classification,
-                ))
+        edges = [NetworkEdge(**p) for p in pairs_raw]
 
         return NetworkGraphResponse(
             model_id=model_id,
             nodes=nodes,
             edges=edges,
-            threshold=float(threshold_percentile),
+            threshold=returned_pct,
         )

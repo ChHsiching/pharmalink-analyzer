@@ -16,10 +16,14 @@ class AnalysisService:
     def __init__(self, resolver: CheckpointResolver):
         self._resolver = resolver
 
-    def get_attention_matrix(self, model_id: str, top_k: int = 10, threshold_percentile: int | None = None):
+    def _extract_attention(self, model_id: str) -> tuple[np.ndarray, list[str]]:
         cp_dir, config = self._resolver.resolve(model_id)
         X, feature_names = self._resolver.get_features(config.dataset_id)
         matrix = extract_attention_weights(cp_dir, X, config)
+        return matrix, feature_names
+
+    def get_attention_matrix(self, model_id: str, top_k: int = 10, threshold_percentile: int | None = None):
+        matrix, feature_names = self._extract_attention(model_id)
         pairs_raw, returned_pct = extract_top_pairs(matrix, feature_names, top_k, threshold_percentile)
         pairs = [AttentionPair(**p) for p in pairs_raw]
         return AttentionMatrixResponse(
@@ -31,9 +35,7 @@ class AnalysisService:
         )
 
     def get_heatmap_data(self, model_id: str):
-        cp_dir, config = self._resolver.resolve(model_id)
-        X, feature_names = self._resolver.get_features(config.dataset_id)
-        matrix = extract_attention_weights(cp_dir, X, config)
+        matrix, feature_names = self._extract_attention(model_id)
         return HeatmapDataResponse(
             model_id=model_id,
             feature_names=feature_names,
@@ -43,34 +45,23 @@ class AnalysisService:
         )
 
     def get_network_graph(self, model_id: str, threshold_percentile: int | None = None):
-        cp_dir, config = self._resolver.resolve(model_id)
-        X, feature_names = self._resolver.get_features(config.dataset_id)
-        matrix = extract_attention_weights(cp_dir, X, config)
-        n = len(feature_names)
+        matrix, feature_names = self._extract_attention(model_id)
 
         if threshold_percentile is None:
             threshold_percentile = 50
 
-        pair_weights = [float((matrix[i][j] + matrix[j][i]) / 2)
-                        for i in range(n) for j in range(i + 1, n)]
-        abs_threshold = float(np.percentile(pair_weights, threshold_percentile))
+        all_pairs_count = len(feature_names) * (len(feature_names) - 1) // 2
+        pairs_raw, returned_pct = extract_top_pairs(
+            matrix, feature_names, top_k=all_pairs_count,
+            threshold_percentile=threshold_percentile,
+        )
 
         nodes = [NetworkNode(id=name, name=name) for name in feature_names]
-        edges = []
-        for i in range(n):
-            for j in range(i + 1, n):
-                weight = float((matrix[i][j] + matrix[j][i]) / 2)
-                classification = "synergistic" if weight >= abs_threshold else "antagonistic"
-                edges.append(NetworkEdge(
-                    source=feature_names[i],
-                    target=feature_names[j],
-                    weight=weight,
-                    classification=classification,
-                ))
+        edges = [NetworkEdge(**p) for p in pairs_raw]
 
         return NetworkGraphResponse(
             model_id=model_id,
             nodes=nodes,
             edges=edges,
-            threshold=float(threshold_percentile),
+            threshold=returned_pct,
         )

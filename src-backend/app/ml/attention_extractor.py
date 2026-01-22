@@ -48,7 +48,7 @@ def extract_top_pairs(
     all_weights = [p["weight"] for p in pairs]
     abs_threshold = float(np.percentile(all_weights, threshold_percentile))
 
-    for p in pairs[:top_k]:
+    for p in pairs:
         p["classification"] = (
             "synergistic" if p["weight"] >= abs_threshold else "antagonistic"
         )

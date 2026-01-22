@@ -16,10 +16,14 @@ class AnalysisService:
     def __init__(self, resolver: CheckpointResolver):
         self._resolver = resolver
 
-    def get_attention_matrix(self, model_id: str, top_k: int = 10, threshold_percentile: int | None = None):
+    def _extract_attention(self, model_id: str) -> tuple[np.ndarray, list[str]]:
         cp_dir, config = self._resolver.resolve(model_id)
         X, feature_names = self._resolver.get_features(config.dataset_id)
         matrix = extract_attention_weights(cp_dir, X, config)
+        return matrix, feature_names
+
+    def get_attention_matrix(self, model_id: str, top_k: int = 10, threshold_percentile: int | None = None):
+        matrix, feature_names = self._extract_attention(model_id)
         pairs_raw, returned_pct = extract_top_pairs(matrix, feature_names, top_k, threshold_percentile)
         pairs = [AttentionPair(**p) for p in pairs_raw]
         return AttentionMatrixResponse(
@@ -31,9 +35,7 @@ class AnalysisService:
         )
 
     def get_heatmap_data(self, model_id: str):
-        cp_dir, config = self._resolver.resolve(model_id)
-        X, feature_names = self._resolver.get_features(config.dataset_id)
-        matrix = extract_attention_weights(cp_dir, X, config)
+        matrix, feature_names = self._extract_attention(model_id)
         return HeatmapDataResponse(
             model_id=model_id,
             feature_names=feature_names,
@@ -43,9 +45,7 @@ class AnalysisService:
         )
 
     def get_network_graph(self, model_id: str, threshold_percentile: int | None = None):
-        cp_dir, config = self._resolver.resolve(model_id)
-        X, feature_names = self._resolver.get_features(config.dataset_id)
-        matrix = extract_attention_weights(cp_dir, X, config)
+        matrix, feature_names = self._extract_attention(model_id)
         n = len(feature_names)
 
         if threshold_percentile is None:

@@ -12,6 +12,13 @@ def extract_attention_weights(
     features: np.ndarray,
     config: TrainingConfig,
 ) -> np.ndarray:
+    from app.ml.checkpoint_loader import load_scaler_params
+
+    scaler_path = checkpoint_dir / "scaler_params.json"
+    if scaler_path.exists():
+        scaler_mean, scaler_scale = load_scaler_params(scaler_path)
+        features = (features - scaler_mean) / scaler_scale
+
     model = load_model(checkpoint_dir, features.shape[1], config)
 
     with torch.no_grad():

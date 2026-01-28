@@ -285,3 +285,79 @@ def test_pareto_regression_forwards_preset():
         call_kwargs = MockSR.call_args_list[0][1]
         assert call_kwargs["population_size"] == 500
         assert call_kwargs["generations"] == 30
+
+
+# ---------------------------------------------------------------------------
+# init_depth and const_range config tests (Issue #54)
+# ---------------------------------------------------------------------------
+
+
+def test_preset_config_has_init_depth():
+    for preset_name, cfg in PRESET_CONFIG.items():
+        assert "init_depth" in cfg, f"Preset '{preset_name}' missing init_depth"
+        assert len(cfg["init_depth"]) == 2
+        assert cfg["init_depth"][0] < cfg["init_depth"][1]
+
+
+def test_preset_config_has_const_range():
+    for preset_name, cfg in PRESET_CONFIG.items():
+        assert "const_range" in cfg, f"Preset '{preset_name}' missing const_range"
+        assert len(cfg["const_range"]) == 2
+        assert cfg["const_range"][0] < cfg["const_range"][1]
+
+
+def test_init_depth_wider_than_before():
+    for preset_name, cfg in PRESET_CONFIG.items():
+        assert cfg["init_depth"][1] >= 8, (
+            f"Preset '{preset_name}' init_depth max {cfg['init_depth'][1]} < 8"
+        )
+
+
+def test_const_range_wider_than_before():
+    for preset_name, cfg in PRESET_CONFIG.items():
+        assert abs(cfg["const_range"][0]) >= 2.0, (
+            f"Preset '{preset_name}' const_range lower {cfg['const_range'][0]} > -2.0"
+        )
+        assert cfg["const_range"][1] >= 2.0, (
+            f"Preset '{preset_name}' const_range upper {cfg['const_range'][1]} < 2.0"
+        )
+
+
+def test_init_depth_forwarded_to_regressor():
+    """init_depth from PRESET_CONFIG should be forwarded to gplearn."""
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_model = _make_mock_model("add(X0, X1)", ["a", "b"])
+    with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
+        run_symbolic_regression(X, y, ["a", "b"], preset="quick")
+        call_kwargs = MockSR.call_args[1]
+        assert call_kwargs["init_depth"] == (2, 8)
+
+
+def test_const_range_forwarded_to_regressor():
+    """const_range from PRESET_CONFIG should be forwarded to gplearn."""
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_model = _make_mock_model("add(X0, X1)", ["a", "b"])
+    with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
+        run_symbolic_regression(X, y, ["a", "b"], preset="quick")
+        call_kwargs = MockSR.call_args[1]
+        assert call_kwargs["const_range"] == (-2.0, 2.0)
+
+
+def test_pareto_forwards_init_depth():
+    """init_depth should be forwarded in pareto regression too."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_models = [
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+    ]
+    with patch("gplearn.genetic.SymbolicRegressor") as MockSR:
+        MockSR.side_effect = mock_models
+        run_pareto_regression(X, y, ["a", "b"], preset="quick")
+        for call in MockSR.call_args_list:
+            assert call[1]["init_depth"] == (2, 8)
+            assert call[1]["const_range"] == (-2.0, 2.0)

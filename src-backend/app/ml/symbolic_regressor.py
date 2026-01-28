@@ -84,9 +84,9 @@ def _parse(tokens: list[str], pos: int, var_map: dict) -> tuple:
 
 
 PRESET_CONFIG = {
-    "quick": {"population_size": 500, "generations": 30, "parsimony_coefficient": 0.01},
-    "standard": {"population_size": 1000, "generations": 60, "parsimony_coefficient": 0.005},
-    "thorough": {"population_size": 2000, "generations": 100, "parsimony_coefficient": 0.001},
+    "quick": {"population_size": 500, "generations": 30, "parsimony_coefficient": 0.01, "init_depth": (2, 8), "const_range": (-2.0, 2.0)},
+    "standard": {"population_size": 1000, "generations": 60, "parsimony_coefficient": 0.005, "init_depth": (2, 8), "const_range": (-2.0, 2.0)},
+    "thorough": {"population_size": 2000, "generations": 100, "parsimony_coefficient": 0.001, "init_depth": (2, 8), "const_range": (-2.0, 2.0)},
 }
 
 
@@ -107,8 +107,8 @@ def run_symbolic_regression(X, y, feature_names, preset="standard"):
         generations=preset_params["generations"],
         parsimony_coefficient=preset_params["parsimony_coefficient"],
         tournament_size=20,
-        init_depth=(2, 6),
-        const_range=(-1.0, 1.0),
+        init_depth=preset_params.get("init_depth", (2, 8)),
+        const_range=preset_params.get("const_range", (-2.0, 2.0)),
         p_crossover=0.7,
         p_subtree_mutation=0.1,
         p_hoist_mutation=0.05,
@@ -175,8 +175,8 @@ def run_pareto_regression(X, y, feature_names, preset="standard"):
             generations=preset_params["generations"],
             parsimony_coefficient=parsimony_coefficient,
             tournament_size=20,
-            init_depth=(2, 6),
-            const_range=(-1.0, 1.0),
+            init_depth=preset_params.get("init_depth", (2, 8)),
+            const_range=preset_params.get("const_range", (-2.0, 2.0)),
             p_crossover=0.7,
             p_subtree_mutation=0.1,
             p_hoist_mutation=0.05,

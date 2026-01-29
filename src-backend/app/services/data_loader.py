@@ -9,6 +9,11 @@ class DataLoader:
     def __init__(self, data_dir: Path | None = None):
         self._data_dir = data_dir or DATA_DIR
         self._datasets: dict[str, tuple[DatasetMeta, pd.DataFrame]] = {}
+        self._checkpoint_resolver = None
+
+    def set_checkpoint_resolver(self, resolver):
+        """Inject a checkpoint resolver. Pass None to remove the guard."""
+        self._checkpoint_resolver = resolver
 
     def load_preset_datasets(self) -> list[DatasetMeta]:
         if not self._data_dir.exists():
@@ -112,6 +117,12 @@ class DataLoader:
     def update_target(self, dataset_id: str, target_column: str) -> DatasetMeta:
         if dataset_id not in self._datasets:
             raise ValueError(f"Dataset '{dataset_id}' not found")
+        if self._checkpoint_resolver is not None:
+            checkpoints = self._checkpoint_resolver.list_checkpoints()
+            if any(cp.dataset_id == dataset_id for cp in checkpoints):
+                raise ValueError(
+                    f"Cannot change target: dataset '{dataset_id}' has existing checkpoints"
+                )
         meta, df = self._datasets[dataset_id]
         if target_column not in df.columns:
             raise ValueError(f"Column '{target_column}' not found in dataset")

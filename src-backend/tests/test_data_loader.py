@@ -221,3 +221,37 @@ def test_update_target_same_column(loader):
     updated = loader.update_target(meta.id, "TC")
     assert updated.target == "TC"
     assert updated.feature_names == ["QA", "CGA", "CA"]
+
+
+def test_update_target_blocked_by_checkpoint(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+
+    from unittest.mock import MagicMock
+    mock_cp = MagicMock()
+    mock_cp.dataset_id = meta.id
+    mock_resolver = MagicMock()
+    mock_resolver.list_checkpoints.return_value = [mock_cp]
+    loader.set_checkpoint_resolver(mock_resolver)
+
+    with pytest.raises(ValueError, match="checkpoint"):
+        loader.update_target(meta.id, "CGA")
+
+    loader.set_checkpoint_resolver(None)
+
+
+def test_update_target_allowed_without_checkpoints(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+
+    from unittest.mock import MagicMock
+    mock_resolver = MagicMock()
+    mock_resolver.list_checkpoints.return_value = []
+    loader.set_checkpoint_resolver(mock_resolver)
+
+    updated = loader.update_target(meta.id, "CGA")
+    assert updated.target == "CGA"
+
+    loader.set_checkpoint_resolver(None)

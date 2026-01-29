@@ -6,8 +6,9 @@ feature engineering, symbolic regression) without any state management.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from app.ml.expression_impact import compute_impact
 import numpy as np
 import sympy
 
@@ -34,6 +35,7 @@ class PipelineResult:
     loss: float
     r2_score: float
     pareto_equations: list[dict]
+    variable_impact: dict[str, float] = field(default_factory=dict)
 
 
 class ExpressionPipeline:
@@ -106,6 +108,16 @@ class ExpressionPipeline:
                 f"Equation extraction failed: {e}"
             ) from e
 
+        variable_impact = compute_impact(
+            sympy_expr=best_eq["sympy_expr"],
+            feature_names=feature_names,
+            X=X,
+            pairs_raw=pairs_raw,
+            attention_matrix=matrix,
+            scaler=scaler,
+            aug_names=aug_names,
+        )
+
         return PipelineResult(
             sympy_expr=best_eq["sympy_expr"],
             latex=best_eq["latex"],
@@ -113,4 +125,5 @@ class ExpressionPipeline:
             loss=best_eq["loss"],
             r2_score=best_eq["r2_score"],
             pareto_equations=pareto_equations,
+            variable_impact=variable_impact,
         )

@@ -49,6 +49,7 @@ class ExpressionService:
             tree=sympy_to_tree(state.current_sympy),
             pareto_count=len(state.pareto_equations),
             pareto_index=pareto_index,
+            variable_impact=state.variable_impact,
         )
 
     def generate(self, model_id: str, top_k: int = 10, preset: str = "standard") -> ExpressionResponse:
@@ -63,6 +64,7 @@ class ExpressionService:
             current_complexity=result.complexity,
             current_r2=result.r2_score,
             pareto_equations=result.pareto_equations,
+            variable_impact=result.variable_impact,
         )
         self._state.push_history(state, "generate")
         self._state.put(state)

@@ -32,6 +32,7 @@ class MockExpressionService:
                     "complexity": 3,
                     "r2_score": 0.92,
                     "tree": {"type": "variable", "value": "x0", "children": []},
+                    "variable_impact": {"x0": 1.0, "x1": 0.5},
                 },
             )
         if task_id == "task_failed":
@@ -52,6 +53,7 @@ class MockExpressionService:
             complexity=1,
             r2_score=0.90,
             tree=ExpressionNode(type="variable", value="x0", children=[]),
+            variable_impact={"x0": 1.0, "x1": 0.5},
         )
 
     def optimize(self, expr_id):
@@ -63,6 +65,7 @@ class MockExpressionService:
             latex="x_{0}",
             complexity=1,
             r2_score=0.88,
+            variable_impact={"x0": 1.0, "x1": 0.5},
             tree=ExpressionNode(type="variable", value="x0", children=[]),
         )
 
@@ -83,6 +86,7 @@ class MockExpressionService:
                     ExpressionNode(type="variable", value="x1", children=[]),
                 ],
             ),
+            variable_impact={"x0": 1.0, "x1": 0.5},
         )
 
     def get_history(self, expr_id):
@@ -111,6 +115,7 @@ class MockExpressionService:
             complexity=3,
             r2_score=0.92,
             tree=ExpressionNode(type="variable", value="x0", children=[]),
+            variable_impact={"x0": 1.0, "x1": 0.5},
         )
 
 
@@ -269,3 +274,15 @@ async def test_get_task_result_not_found(mock_service):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get("/api/v1/expressions/result/not_found")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_generate_response_includes_variable_impact(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions/result/task_completed")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "completed"
+    impact = data["result"]["variable_impact"]
+    assert isinstance(impact, dict)
+    assert "x0" in impact

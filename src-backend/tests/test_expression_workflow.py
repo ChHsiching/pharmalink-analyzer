@@ -27,6 +27,7 @@ def _fake_pipeline_result() -> PipelineResult:
             {"sympy_expr": expr, "latex": "X_{0} + X_{1} X_{2}", "complexity": 2, "r2_score": 0.95},
             {"sympy_expr": x0, "latex": "X_{0}", "complexity": 0, "r2_score": 0.80},
         ],
+        variable_impact={"X0": 1.0, "X1": 0.8, "X2": 0.6},
     )
 
 

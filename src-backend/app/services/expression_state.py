@@ -18,6 +18,7 @@ class ExpressionState:
     current_complexity: int
     current_r2: float
     pareto_equations: list[dict] = field(default_factory=list)
+    variable_impact: dict[str, float] = field(default_factory=dict)
     history: list[dict] = field(default_factory=list)
     history_index: int = -1
 
@@ -47,6 +48,7 @@ class ExpressionStateManager:
             "latex": state.current_latex,
             "complexity": state.current_complexity,
             "r2": state.current_r2,
+            "variable_impact": state.variable_impact,
         }
         state.history = state.history[: state.history_index + 1]
         state.history.append(entry)
@@ -64,6 +66,7 @@ class ExpressionStateManager:
         state.current_latex = h["latex"]
         state.current_complexity = h["complexity"]
         state.current_r2 = h["r2"]
+        state.variable_impact = h.get("variable_impact", {})
         return state
 
     def get_history_entries(self, expr_id: str) -> tuple[list[dict], int]:

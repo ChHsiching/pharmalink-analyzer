@@ -18,6 +18,7 @@ class ExpressionResponse(BaseModel):
     tree: ExpressionNode
     pareto_count: int = 1
     pareto_index: int = 0
+    variable_impact: dict[str, float] = {}
 
 
 class ExpressionHistoryEntry(BaseModel):

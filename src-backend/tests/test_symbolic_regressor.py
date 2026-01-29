@@ -23,8 +23,8 @@ def interaction_data():
     X = rng.standard_normal((30, 5)).astype(np.float32)
     names = ["f0", "f1", "f2", "f3", "f4"]
     pairs = [
-        {"source": "f0", "target": "f1", "weight": 0.8},
-        {"source": "f2", "target": "f3", "weight": 0.6},
+        {"source": "f0", "target": "f1", "weight": 0.8, "classification": "synergistic"},
+        {"source": "f2", "target": "f3", "weight": 0.6, "classification": "synergistic"},
     ]
     return X, names, pairs
 

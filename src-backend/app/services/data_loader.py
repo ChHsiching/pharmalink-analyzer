@@ -21,13 +21,16 @@ class DataLoader:
         return metas
 
     def _load_csv(
-        self, path: Path, is_preset: bool = False, name: str | None = None
+        self, path: Path, is_preset: bool = False, name: str | None = None,
+        target_column: str | None = None,
     ) -> tuple[DatasetMeta, pd.DataFrame]:
         df = pd.read_csv(path)
         df.columns = df.columns.str.strip()
 
-        target_col = df.columns[-1]
-        feature_names = list(df.columns[:-1])
+        target_col = target_column if target_column else df.columns[-1]
+        if target_col not in df.columns:
+            raise ValueError(f"Column '{target_col}' not found in CSV")
+        feature_names = [c for c in df.columns if c != target_col]
         plant_part = self._detect_plant_part(path.name)
 
         meta = DatasetMeta(
@@ -84,7 +87,8 @@ class DataLoader:
         return self._datasets[dataset_id][1].copy()
 
     def add_dataset(
-        self, filename: str, content: bytes, name: str | None = None
+        self, filename: str, content: bytes, name: str | None = None,
+        target_column: str | None = None,
     ) -> DatasetMeta:
         import tempfile
 
@@ -92,7 +96,7 @@ class DataLoader:
             f.write(content)
             temp_path = Path(f.name)
         try:
-            meta, df = self._load_csv(temp_path, is_preset=False, name=name)
+            meta, df = self._load_csv(temp_path, is_preset=False, name=name, target_column=target_column)
             stem = Path(filename).stem
             base_id = stem
             meta = meta.model_copy(update={"id": stem, "filename": filename})

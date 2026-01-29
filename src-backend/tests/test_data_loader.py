@@ -154,3 +154,31 @@ def test_meta_includes_all_columns(loader):
     detail = loader.get_dataset("fruit-test-tc")
     assert detail is not None
     assert detail.columns == ["QA", "CGA", "CA", "TC"]
+
+
+def test_add_dataset_custom_target_column(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv, target_column="CGA")
+    assert meta.target == "CGA"
+    assert "TC" in meta.feature_names
+    assert "QA" in meta.feature_names
+    assert "CGA" not in meta.feature_names
+
+
+def test_add_dataset_invalid_target_column(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    with pytest.raises(ValueError, match="not found"):
+        loader.add_dataset("custom.csv", csv, target_column="INVALID")
+
+
+def test_load_csv_default_target_is_last_column(tmp_path):
+    csv = "QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    (tmp_path / "test.csv").write_text(csv)
+    loader = DataLoader(data_dir=tmp_path)
+    loader.load_preset_datasets()
+    detail = loader.get_dataset("test")
+    assert detail is not None
+    assert detail.target == "TC"
+    assert detail.feature_names == ["QA", "CGA", "CA"]

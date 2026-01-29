@@ -13,6 +13,7 @@ export interface ExpressionResponse {
   tree: ExpressionNode;
   pareto_count: number;
   pareto_index: number;
+  variable_impact: Record<string, number>;
 }
 
 export interface ExpressionHistoryEntry {

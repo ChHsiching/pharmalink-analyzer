@@ -40,9 +40,13 @@
         <div class="panel tree-panel">
           <h3>表达式树</h3>
           <div class="tree-container">
-            <TreeNode :node="expression.tree" :depth="0" />
+            <TreeNode :node="expression.tree" :depth="0" :variable-impact="expression.variable_impact" />
           </div>
         </div>
+      </div>
+      <div v-if="impactChartOption" class="panel impact-panel">
+        <h3>成分影响力</h3>
+        <VChart :option="impactChartOption" class="impact-chart" autoresize />
       </div>
     </template>
   </div>
@@ -56,6 +60,16 @@ import { useExpression } from "@/composables/useExpression";
 import { useWorkflow } from "@/composables/useWorkflow";
 import { useDatasets } from "@/composables/useDatasets";
 import TreeNode from "./TreeNode.vue";
+import VChart from "vue-echarts";
+import { use } from "echarts/core";
+import { BarChart } from "echarts/charts";
+import {
+  GridComponent,
+  TooltipComponent,
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+
+use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
 const selectedCheckpoint = ref("");
 const selectedPreset = ref("standard");
@@ -75,6 +89,38 @@ const targetName = ref("");
 const canUndo = computed(() => history.value ? history.value.current_index > 0 : false);
 const canRedo = computed(() => history.value ? history.value.current_index < history.value.history.length - 1 : false);
 const loadingMessage = computed(() => expression.value ? "处理中..." : "符号回归可能需要数分钟，请耐心等待...");
+
+const impactChartOption = computed(() => {
+  const impact = expression.value?.variable_impact;
+  if (!impact || Object.keys(impact).length === 0) return null;
+
+  const sorted = Object.entries(impact)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => a - b);
+
+  return {
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    grid: { left: 100, right: 40, top: 10, bottom: 20 },
+    xAxis: { type: "value", max: 1, name: "影响力" },
+    yAxis: {
+      type: "category",
+      data: sorted.map(([name]) => name),
+      axisLabel: { fontSize: 12 },
+    },
+    series: [{
+      type: "bar",
+      data: sorted.map(([, value]) => value.toFixed(2)),
+      itemStyle: { color: "#4caf50" },
+      barMaxWidth: 24,
+      label: {
+        show: true,
+        position: "right",
+        formatter: "{c}",
+        fontSize: 11,
+      },
+    }],
+  };
+});
 
 async function generate() {
   if (!selectedCheckpoint.value) return;
@@ -223,4 +269,6 @@ h2 { color: #2e7d32; }
 }
 .loading { color: #666; }
 .error { color: #f44336; }
+.impact-panel { margin-top: 20px; }
+.impact-chart { height: 240px; width: 100%; }
 </style>

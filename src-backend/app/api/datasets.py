@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
-from app.models.dataset import DatasetMeta, DatasetDetail, DatasetStatsResponse
+from app.models.dataset import DatasetMeta, DatasetDetail, DatasetStatsResponse, UpdateTargetRequest
 from app.services.data_loader import data_loader
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
@@ -49,3 +49,18 @@ async def delete_dataset(dataset_id: str):
         raise HTTPException(status_code=404, detail="Dataset not found")
     if result == "is_preset":
         raise HTTPException(status_code=403, detail="Cannot delete preset dataset")
+
+
+@router.patch("/{dataset_id}/target", response_model=DatasetMeta)
+async def update_target(dataset_id: str, req: UpdateTargetRequest):
+    try:
+        return data_loader.update_target(dataset_id, req.target_column)
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg and "Column" in msg:
+            raise HTTPException(status_code=400, detail=msg)
+        if "not found" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        if "checkpoint" in msg:
+            raise HTTPException(status_code=409, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)

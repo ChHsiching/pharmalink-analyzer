@@ -29,3 +29,7 @@ class DatasetDetail(DatasetMeta):
 class DatasetStatsResponse(BaseModel):
     dataset_id: str
     stats: list[ColumnStats]
+
+
+class UpdateTargetRequest(BaseModel):
+    target_column: str

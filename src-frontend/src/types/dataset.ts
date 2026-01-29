@@ -15,6 +15,7 @@ export interface DatasetMeta {
   n_samples: number;
   n_features: number;
   feature_names: string[];
+  columns: string[];
   is_preset: boolean;
 }
 

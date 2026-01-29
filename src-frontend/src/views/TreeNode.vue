@@ -1,9 +1,12 @@
 <template>
   <div class="tree-node" :style="{ paddingLeft: depth * 20 + 'px' }">
-    <div class="node-label" @click="toggle">
+    <div class="node-label" @click="toggle" :class="{ 'zero-impact': isZeroImpact }">
       <span class="toggle">{{ expanded ? "▾" : "▸" }}</span>
       <span :class="['node-badge', node.type]">{{ node.type[0].toUpperCase() }}</span>
       <span class="node-value">{{ node.value }}</span>
+      <span v-if="impactValue !== null" class="impact-badge">
+        {{ (impactValue * 100).toFixed(0) }}%
+      </span>
     </div>
     <div v-if="expanded && node.children.length > 0" class="node-children">
       <TreeNode
@@ -11,21 +14,30 @@
         :key="i"
         :node="child"
         :depth="depth + 1"
+        :variable-impact="variableImpact"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import type { ExpressionNode } from "@/types/expression";
 
 const props = defineProps<{
   node: ExpressionNode;
   depth: number;
+  variableImpact?: Record<string, number>;
 }>();
 
 const expanded = ref(props.depth < 3);
+
+const impactValue = computed(() => {
+  if (props.node.type !== "variable" || !props.variableImpact) return null;
+  return props.variableImpact[props.node.value] ?? null;
+});
+
+const isZeroImpact = computed(() => impactValue.value !== null && impactValue.value === 0);
 
 function toggle() {
   expanded.value = !expanded.value;
@@ -55,4 +67,13 @@ function toggle() {
 .node-badge.variable { background: #4caf50; }
 .node-badge.constant { background: #9e9e9e; }
 .node-value { font-family: monospace; }
+.impact-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  margin-left: 4px;
+}
+.zero-impact { opacity: 0.4; }
 </style>

@@ -147,3 +147,10 @@ def test_header_whitespace_stripping(tmp_path):
     assert "QA" in detail.feature_names
     assert "CA" in detail.feature_names
     assert "TC" == detail.target
+
+
+def test_meta_includes_all_columns(loader):
+    loader.load_preset_datasets()
+    detail = loader.get_dataset("fruit-test-tc")
+    assert detail is not None
+    assert detail.columns == ["QA", "CGA", "CA", "TC"]

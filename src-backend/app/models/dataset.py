@@ -18,6 +18,7 @@ class DatasetMeta(BaseModel):
     n_samples: int
     n_features: int
     feature_names: list[str]
+    columns: list[str]
     is_preset: bool
 
 

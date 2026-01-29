@@ -39,6 +39,7 @@ class DataLoader:
             n_samples=len(df),
             n_features=len(feature_names),
             feature_names=feature_names,
+            columns=list(df.columns),
             is_preset=is_preset,
         )
         return meta, df

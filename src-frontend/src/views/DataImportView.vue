@@ -38,7 +38,18 @@
         <div class="meta-tags">
           <span class="tag">样本数: {{ selected.n_samples }}</span>
           <span class="tag">特征数: {{ selected.n_features }}</span>
-          <span class="tag highlight">Target: {{ selected.target }}</span>
+          <span class="tag highlight">
+            Target:
+            <select
+              class="target-select"
+              :value="selected.target"
+              @change="handleTargetChange"
+            >
+              <option v-for="col in selected.columns" :key="col" :value="col">
+                {{ col }}
+              </option>
+            </select>
+          </span>
           <span class="tag">部位: {{ selected.plant_part }}</span>
           <span v-if="!selected.is_preset" class="tag custom">自定义</span>
           <span v-else class="tag">预置</span>
@@ -110,8 +121,14 @@ import type {
   DatasetStatsResponse,
 } from "@/types/dataset";
 
-const { listDatasets, getDataset, getDatasetStats, uploadDataset, deleteDataset } =
-  useDatasets();
+const {
+  listDatasets,
+  getDataset,
+  getDatasetStats,
+  uploadDataset,
+  deleteDataset,
+  updateTarget,
+} = useDatasets();
 
 const { markDatasetsAvailable } = useWorkflow();
 const datasets = ref<DatasetMeta[]>([]);
@@ -182,6 +199,18 @@ async function handleDelete(id: string) {
     await fetchData();
   } catch {
     error.value = "删除失败";
+  }
+}
+
+async function handleTargetChange(event: Event) {
+  const select = event.target as HTMLSelectElement;
+  const newTarget = select.value;
+  if (!selected.value || newTarget === selected.value.target) return;
+  try {
+    const updated = await updateTarget(selected.value.id, newTarget);
+    await selectDataset(updated.id);
+  } catch {
+    error.value = "切换目标变量失败";
   }
 }
 
@@ -353,5 +382,21 @@ td.target {
   justify-content: center;
   height: 100%;
   color: #999;
+}
+
+.target-select {
+  background: transparent;
+  border: 1px solid #e65100;
+  border-radius: 4px;
+  color: #e65100;
+  font-size: 13px;
+  padding: 0 4px;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.target-select:focus {
+  outline: 2px solid #e65100;
+  outline-offset: 1px;
 }
 </style>

@@ -9,6 +9,11 @@ class DataLoader:
     def __init__(self, data_dir: Path | None = None):
         self._data_dir = data_dir or DATA_DIR
         self._datasets: dict[str, tuple[DatasetMeta, pd.DataFrame]] = {}
+        self._checkpoint_resolver = None
+
+    def set_checkpoint_resolver(self, resolver):
+        """Inject a checkpoint resolver. Pass None to remove the guard."""
+        self._checkpoint_resolver = resolver
 
     def load_preset_datasets(self) -> list[DatasetMeta]:
         if not self._data_dir.exists():
@@ -21,13 +26,16 @@ class DataLoader:
         return metas
 
     def _load_csv(
-        self, path: Path, is_preset: bool = False, name: str | None = None
+        self, path: Path, is_preset: bool = False, name: str | None = None,
+        target_column: str | None = None,
     ) -> tuple[DatasetMeta, pd.DataFrame]:
         df = pd.read_csv(path)
         df.columns = df.columns.str.strip()
 
-        target_col = df.columns[-1]
-        feature_names = list(df.columns[:-1])
+        target_col = target_column if target_column else df.columns[-1]
+        if target_col not in df.columns:
+            raise ValueError(f"Column '{target_col}' not found in CSV")
+        feature_names = [c for c in df.columns if c != target_col]
         plant_part = self._detect_plant_part(path.name)
 
         meta = DatasetMeta(
@@ -39,6 +47,7 @@ class DataLoader:
             n_samples=len(df),
             n_features=len(feature_names),
             feature_names=feature_names,
+            columns=list(df.columns),
             is_preset=is_preset,
         )
         return meta, df
@@ -83,7 +92,8 @@ class DataLoader:
         return self._datasets[dataset_id][1].copy()
 
     def add_dataset(
-        self, filename: str, content: bytes, name: str | None = None
+        self, filename: str, content: bytes, name: str | None = None,
+        target_column: str | None = None,
     ) -> DatasetMeta:
         import tempfile
 
@@ -91,7 +101,7 @@ class DataLoader:
             f.write(content)
             temp_path = Path(f.name)
         try:
-            meta, df = self._load_csv(temp_path, is_preset=False, name=name)
+            meta, df = self._load_csv(temp_path, is_preset=False, name=name, target_column=target_column)
             stem = Path(filename).stem
             base_id = stem
             meta = meta.model_copy(update={"id": stem, "filename": filename})
@@ -103,6 +113,27 @@ class DataLoader:
             return meta
         finally:
             temp_path.unlink(missing_ok=True)
+
+    def update_target(self, dataset_id: str, target_column: str) -> DatasetMeta:
+        if dataset_id not in self._datasets:
+            raise ValueError(f"Dataset '{dataset_id}' not found")
+        if self._checkpoint_resolver is not None:
+            checkpoints = self._checkpoint_resolver.list_checkpoints()
+            if any(cp.dataset_id == dataset_id for cp in checkpoints):
+                raise ValueError(
+                    f"Cannot change target: dataset '{dataset_id}' has existing checkpoints"
+                )
+        meta, df = self._datasets[dataset_id]
+        if target_column not in df.columns:
+            raise ValueError(f"Column '{target_column}' not found in dataset")
+        feature_names = [c for c in df.columns if c != target_column]
+        updated_meta = meta.model_copy(update={
+            "target": target_column,
+            "feature_names": feature_names,
+            "n_features": len(feature_names),
+        })
+        self._datasets[dataset_id] = (updated_meta, df)
+        return updated_meta
 
     def delete_dataset(self, dataset_id: str) -> str:
         if dataset_id not in self._datasets:

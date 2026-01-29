@@ -147,3 +147,111 @@ def test_header_whitespace_stripping(tmp_path):
     assert "QA" in detail.feature_names
     assert "CA" in detail.feature_names
     assert "TC" == detail.target
+
+
+def test_meta_includes_all_columns(loader):
+    loader.load_preset_datasets()
+    detail = loader.get_dataset("fruit-test-tc")
+    assert detail is not None
+    assert detail.columns == ["QA", "CGA", "CA", "TC"]
+
+
+def test_add_dataset_custom_target_column(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv, target_column="CGA")
+    assert meta.target == "CGA"
+    assert "TC" in meta.feature_names
+    assert "QA" in meta.feature_names
+    assert "CGA" not in meta.feature_names
+
+
+def test_add_dataset_invalid_target_column(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    with pytest.raises(ValueError, match="not found"):
+        loader.add_dataset("custom.csv", csv, target_column="INVALID")
+
+
+def test_load_csv_default_target_is_last_column(tmp_path):
+    csv = "QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    (tmp_path / "test.csv").write_text(csv)
+    loader = DataLoader(data_dir=tmp_path)
+    loader.load_preset_datasets()
+    detail = loader.get_dataset("test")
+    assert detail is not None
+    assert detail.target == "TC"
+    assert detail.feature_names == ["QA", "CGA", "CA"]
+
+
+def test_update_target_success(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+    assert meta.target == "TC"
+
+    updated = loader.update_target(meta.id, "CGA")
+    assert updated.target == "CGA"
+    assert "TC" in updated.feature_names
+    assert "CGA" not in updated.feature_names
+
+    detail = loader.get_dataset(meta.id)
+    assert detail is not None
+    assert detail.target == "CGA"
+
+
+def test_update_target_not_found(loader):
+    loader.load_preset_datasets()
+    with pytest.raises(ValueError, match="not found"):
+        loader.update_target("nonexistent", "CGA")
+
+
+def test_update_target_invalid_column(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+    with pytest.raises(ValueError, match="not found"):
+        loader.update_target(meta.id, "INVALID")
+
+
+def test_update_target_same_column(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+    updated = loader.update_target(meta.id, "TC")
+    assert updated.target == "TC"
+    assert updated.feature_names == ["QA", "CGA", "CA"]
+
+
+def test_update_target_blocked_by_checkpoint(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+
+    from unittest.mock import MagicMock
+    mock_cp = MagicMock()
+    mock_cp.dataset_id = meta.id
+    mock_resolver = MagicMock()
+    mock_resolver.list_checkpoints.return_value = [mock_cp]
+    loader.set_checkpoint_resolver(mock_resolver)
+
+    with pytest.raises(ValueError, match="checkpoint"):
+        loader.update_target(meta.id, "CGA")
+
+    loader.set_checkpoint_resolver(None)
+
+
+def test_update_target_allowed_without_checkpoints(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+
+    from unittest.mock import MagicMock
+    mock_resolver = MagicMock()
+    mock_resolver.list_checkpoints.return_value = []
+    loader.set_checkpoint_resolver(mock_resolver)
+
+    updated = loader.update_target(meta.id, "CGA")
+    assert updated.target == "CGA"
+
+    loader.set_checkpoint_resolver(None)

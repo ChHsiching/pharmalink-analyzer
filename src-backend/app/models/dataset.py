@@ -18,6 +18,7 @@ class DatasetMeta(BaseModel):
     n_samples: int
     n_features: int
     feature_names: list[str]
+    columns: list[str]
     is_preset: bool
 
 
@@ -28,3 +29,7 @@ class DatasetDetail(DatasetMeta):
 class DatasetStatsResponse(BaseModel):
     dataset_id: str
     stats: list[ColumnStats]
+
+
+class UpdateTargetRequest(BaseModel):
+    target_column: str

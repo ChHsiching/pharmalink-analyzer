@@ -26,6 +26,8 @@ def get_evaluation_service() -> EvaluationService:
 
 _expression_service = ExpressionService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
 
+_default_data_loader.set_checkpoint_resolver(CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
+
 
 def get_expression_service() -> ExpressionService:
     return _expression_service

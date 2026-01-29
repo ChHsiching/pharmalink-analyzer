@@ -54,6 +54,7 @@ import katex from "katex";
 import { useTraining } from "@/composables/useTraining";
 import { useExpression } from "@/composables/useExpression";
 import { useWorkflow } from "@/composables/useWorkflow";
+import { useDatasets } from "@/composables/useDatasets";
 import TreeNode from "./TreeNode.vue";
 
 const selectedCheckpoint = ref("");
@@ -68,6 +69,8 @@ const {
   fetchHistory, undoExpression,
   stopPolling,
 } = useExpression();
+const { getDataset } = useDatasets();
+const targetName = ref("");
 
 const canUndo = computed(() => history.value ? history.value.current_index > 0 : false);
 const canRedo = computed(() => history.value ? history.value.current_index < history.value.history.length - 1 : false);
@@ -116,7 +119,8 @@ async function redo() {
 
 function renderLatex() {
   if (katexRef.value && expression.value?.latex) {
-    katex.render(expression.value.latex, katexRef.value, {
+    const prefix = targetName.value ? `${targetName.value} = ` : "";
+    katex.render(prefix + expression.value.latex, katexRef.value, {
       displayMode: true,
       throwOnError: false,
     });
@@ -124,6 +128,22 @@ function renderLatex() {
 }
 
 watch(() => expression.value?.latex, () => nextTick(renderLatex));
+watch(targetName, () => nextTick(renderLatex));
+watch(selectedCheckpoint, async (cpId) => {
+  if (!cpId) {
+    targetName.value = "";
+    return;
+  }
+  const cp = checkpoints.value.find((c) => c.id === cpId);
+  if (cp?.dataset_id) {
+    try {
+      const ds = await getDataset(cp.dataset_id);
+      targetName.value = ds.target;
+    } catch {
+      targetName.value = "";
+    }
+  }
+});
 onMounted(() => { fetchCheckpoints(); });
 onUnmounted(() => { stopPolling(); });
 </script>

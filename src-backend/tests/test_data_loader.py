@@ -182,3 +182,42 @@ def test_load_csv_default_target_is_last_column(tmp_path):
     assert detail is not None
     assert detail.target == "TC"
     assert detail.feature_names == ["QA", "CGA", "CA"]
+
+
+def test_update_target_success(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+    assert meta.target == "TC"
+
+    updated = loader.update_target(meta.id, "CGA")
+    assert updated.target == "CGA"
+    assert "TC" in updated.feature_names
+    assert "CGA" not in updated.feature_names
+
+    detail = loader.get_dataset(meta.id)
+    assert detail is not None
+    assert detail.target == "CGA"
+
+
+def test_update_target_not_found(loader):
+    loader.load_preset_datasets()
+    with pytest.raises(ValueError, match="not found"):
+        loader.update_target("nonexistent", "CGA")
+
+
+def test_update_target_invalid_column(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+    with pytest.raises(ValueError, match="not found"):
+        loader.update_target(meta.id, "INVALID")
+
+
+def test_update_target_same_column(loader):
+    loader.load_preset_datasets()
+    csv = b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n"
+    meta = loader.add_dataset("custom.csv", csv)
+    updated = loader.update_target(meta.id, "TC")
+    assert updated.target == "TC"
+    assert updated.feature_names == ["QA", "CGA", "CA"]

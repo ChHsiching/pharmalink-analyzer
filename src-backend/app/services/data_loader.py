@@ -109,6 +109,21 @@ class DataLoader:
         finally:
             temp_path.unlink(missing_ok=True)
 
+    def update_target(self, dataset_id: str, target_column: str) -> DatasetMeta:
+        if dataset_id not in self._datasets:
+            raise ValueError(f"Dataset '{dataset_id}' not found")
+        meta, df = self._datasets[dataset_id]
+        if target_column not in df.columns:
+            raise ValueError(f"Column '{target_column}' not found in dataset")
+        feature_names = [c for c in df.columns if c != target_column]
+        updated_meta = meta.model_copy(update={
+            "target": target_column,
+            "feature_names": feature_names,
+            "n_features": len(feature_names),
+        })
+        self._datasets[dataset_id] = (updated_meta, df)
+        return updated_meta
+
     def delete_dataset(self, dataset_id: str) -> str:
         if dataset_id not in self._datasets:
             return "not_found"

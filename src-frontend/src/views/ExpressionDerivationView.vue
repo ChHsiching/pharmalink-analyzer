@@ -28,9 +28,11 @@
     <div v-if="loading" class="loading">{{ loadingMessage }}</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-if="expression">
-      <div class="metrics">
-        <span class="metric">复杂度: {{ expression.complexity }}</span>
-        <span class="metric">R²: {{ expression.r2_score.toFixed(4) }}</span>
+      <div class="indicators-grid" v-if="expression?.indicators && Object.keys(expression.indicators).length > 0">
+        <div class="indicator" v-for="(value, key) in expression.indicators" :key="key">
+          <span class="indicator-label">{{ formatIndicatorLabel(key as string) }}</span>
+          <span class="indicator-value">{{ formatIndicatorValue(key as string, value) }}</span>
+        </div>
       </div>
       <div class="panels">
         <div class="panel latex-panel">
@@ -85,6 +87,30 @@ const {
 } = useExpression();
 const { getDataset } = useDatasets();
 const targetName = ref("");
+
+const INDICATOR_LABELS: Record<string, string> = {
+  train_r2: "R² (训练)",
+  test_r2: "R² (测试)",
+  train_mae: "MAE (训练)",
+  test_mae: "MAE (测试)",
+  train_mse: "MSE (训练)",
+  test_mse: "MSE (测试)",
+  train_nmse: "NMSE (训练)",
+  test_nmse: "NMSE (测试)",
+  train_rmse: "RMSE (训练)",
+  test_rmse: "RMSE (测试)",
+  depth: "模型深度",
+  length: "模型长度",
+};
+
+function formatIndicatorLabel(key: string): string {
+  return INDICATOR_LABELS[key] ?? key;
+}
+
+function formatIndicatorValue(key: string, value: number): string {
+  if (key === "depth" || key === "length") return value.toFixed(0);
+  return value.toFixed(4);
+}
 
 const canUndo = computed(() => history.value ? history.value.current_index > 0 : false);
 const canRedo = computed(() => history.value ? history.value.current_index < history.value.history.length - 1 : false);
@@ -232,16 +258,28 @@ h2 { color: #2e7d32; }
   background: #ccc;
   cursor: not-allowed;
 }
-.metrics {
-  display: flex;
-  gap: 20px;
+.indicators-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
   margin-bottom: 16px;
 }
-.metric {
+.indicator {
   background: #e8f5e9;
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.indicator-label {
+  color: #666;
+  font-size: 11px;
+}
+.indicator-value {
+  font-weight: 600;
+  color: #2e7d32;
 }
 .panels {
   display: flex;

@@ -50,6 +50,8 @@ class ExpressionService:
             pareto_count=len(state.pareto_equations),
             pareto_index=pareto_index,
             variable_impact=state.variable_impact,
+            indicators=state.indicators,
+            target_name=state.target_name,
         )
 
     def generate(self, model_id: str, top_k: int = 10, preset: str = "standard") -> ExpressionResponse:
@@ -65,6 +67,8 @@ class ExpressionService:
             current_r2=result.r2_score,
             pareto_equations=result.pareto_equations,
             variable_impact=result.variable_impact,
+            indicators=result.indicators,
+            target_name=result.target_name,
         )
         self._state.push_history(state, "generate")
         self._state.put(state)

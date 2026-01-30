@@ -12,6 +12,7 @@ from app.ml.expression_impact import compute_impact
 import numpy as np
 import sympy
 
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -36,6 +37,8 @@ class PipelineResult:
     r2_score: float
     pareto_equations: list[dict]
     variable_impact: dict[str, float] = field(default_factory=dict)
+    indicators: dict[str, float] = field(default_factory=dict)
+    target_name: str = ""
 
 
 class ExpressionPipeline:
@@ -108,6 +111,34 @@ class ExpressionPipeline:
                 f"Equation extraction failed: {e}"
             ) from e
 
+        best_model = models[-1]
+        y_train_pred = best_model.predict(X_train)
+        y_test_pred = best_model.predict(X_test)
+
+        train_r2 = float(best_model.score(X_train, y_train))
+        test_r2 = best_eq["r2_score"]
+        train_mae = float(mean_absolute_error(y_train, y_train_pred))
+        test_mae = float(mean_absolute_error(y_test, y_test_pred))
+        train_mse = float(mean_squared_error(y_train, y_train_pred))
+        test_mse = float(mean_squared_error(y_test, y_test_pred))
+        train_nmse = train_mse / float(np.var(y_train))
+        test_nmse = test_mse / float(np.var(y_test))
+        train_rmse = float(np.sqrt(train_mse))
+        test_rmse = float(np.sqrt(test_mse))
+
+        indicators = {
+            "train_r2": train_r2, "test_r2": test_r2,
+            "train_mae": train_mae, "test_mae": test_mae,
+            "train_mse": train_mse, "test_mse": test_mse,
+            "train_nmse": train_nmse, "test_nmse": test_nmse,
+            "train_rmse": train_rmse, "test_rmse": test_rmse,
+            "depth": float(best_eq["complexity"]),
+            "length": float(len(str(best_model._program))),
+        }
+
+        dataset = self._resolver._data_loader.get_dataset(config.dataset_id)
+        target_name = dataset.target if dataset else ""
+
         variable_impact = compute_impact(
             sympy_expr=best_eq["sympy_expr"],
             feature_names=feature_names,
@@ -126,4 +157,6 @@ class ExpressionPipeline:
             r2_score=best_eq["r2_score"],
             pareto_equations=pareto_equations,
             variable_impact=variable_impact,
+            indicators=indicators,
+            target_name=target_name,
         )

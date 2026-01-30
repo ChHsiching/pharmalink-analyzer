@@ -50,6 +50,8 @@ class TestExpressionNormalization:
 
         mock_model = MagicMock()
         mock_model.score.return_value = 0.85
+        mock_model.predict.side_effect = lambda X: np.zeros(X.shape[0], dtype=np.float32)
+        mock_model._program = "A"
         mock_pareto_reg.return_value = [mock_model]
         mock_best.return_value = {
             "sympy_expr": __import__("sympy").Symbol("A"),
@@ -114,6 +116,8 @@ class TestExpressionNormalization:
 
         mock_model = MagicMock()
         mock_model.score.return_value = 0.80
+        mock_model.predict.side_effect = lambda X: np.zeros(X.shape[0], dtype=np.float32)
+        mock_model._program = "A"
         mock_pareto_reg.return_value = [mock_model]
         mock_best.return_value = {
             "sympy_expr": __import__("sympy").Symbol("A"),
@@ -174,6 +178,8 @@ class TestExpressionNormalization:
 
         mock_model = MagicMock()
         mock_model.score.return_value = 0.80
+        mock_model.predict.side_effect = lambda X: np.zeros(X.shape[0], dtype=np.float32)
+        mock_model._program = "A"
         mock_pareto_reg.return_value = [mock_model]
         mock_best.return_value = {
             "sympy_expr": __import__("sympy").Symbol("A"),

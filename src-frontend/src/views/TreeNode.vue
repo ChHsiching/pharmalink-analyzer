@@ -52,27 +52,27 @@ function toggle() {
   align-items: center;
   gap: 6px;
   padding: 2px 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
-.node-label:hover { background: #f5f5f5; }
-.toggle { color: #999; width: 12px; }
+.node-label:hover { background: var(--color-surface); }
+.toggle { color: var(--color-stone); width: 12px; }
 .node-badge {
   font-size: 11px;
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   color: white;
 }
-.node-badge.operator { background: #2196f3; }
-.node-badge.function { background: #ff9800; }
-.node-badge.variable { background: #4caf50; }
-.node-badge.constant { background: #9e9e9e; }
+.node-badge.operator { background: var(--color-link-blue); }
+.node-badge.function { background: var(--color-warning); }
+.node-badge.variable { background: var(--color-success); }
+.node-badge.constant { background: var(--color-muted); }
 .node-value { font-family: monospace; }
 .impact-badge {
   font-size: 10px;
   padding: 1px 5px;
-  border-radius: 3px;
-  background: #e8f5e9;
-  color: #2e7d32;
+  border-radius: var(--radius-xs);
+  background: var(--color-tint-mint);
+  color: var(--color-success);
   margin-left: 4px;
 }
 .zero-impact { opacity: 0.4; }

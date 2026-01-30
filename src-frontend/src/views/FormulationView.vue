@@ -2,6 +2,10 @@
   <div class="formulation">
     <h2>最优配比</h2>
 
+    <div v-if="exprId" class="expr-info">
+      当前表达式: <code>{{ exprId }}</code>
+    </div>
+
     <div v-if="!exprId" class="empty-hint">
       请先在「表达式推导」页面生成表达式
     </div>
@@ -179,6 +183,21 @@ const radarOption = computed(() => {
 
 h2 {
   color: #2e7d32;
+}
+
+.expr-info {
+  padding: 8px 12px;
+  background: #e3f2fd;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #1565c0;
+}
+.expr-info code {
+  background: #bbdefb;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
 }
 
 h3 {

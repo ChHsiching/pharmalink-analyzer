@@ -286,3 +286,32 @@ async def test_generate_response_includes_variable_impact(mock_service):
     impact = data["result"]["variable_impact"]
     assert isinstance(impact, dict)
     assert "x0" in impact
+
+
+@pytest.mark.asyncio
+async def test_generate_response_includes_indicators(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions/result/task_completed")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "completed"
+    assert "indicators" in data["result"]
+    indicators = data["result"]["indicators"]
+    assert isinstance(indicators, dict)
+    expected_keys = {
+        "train_r2", "test_r2", "train_mae", "test_mae",
+        "train_mse", "test_mse", "train_nmse", "test_nmse",
+        "train_rmse", "test_rmse", "depth", "length",
+    }
+    assert set(indicators.keys()) == expected_keys
+
+
+@pytest.mark.asyncio
+async def test_generate_response_includes_target_name(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions/result/task_completed")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "completed"
+    assert "target_name" in data["result"]
+    assert isinstance(data["result"]["target_name"], str)

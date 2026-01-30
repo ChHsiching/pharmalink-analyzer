@@ -19,6 +19,8 @@ class ExpressionResponse(BaseModel):
     pareto_count: int = 1
     pareto_index: int = 0
     variable_impact: dict[str, float] = {}
+    indicators: dict[str, float] = {}
+    target_name: str = ""
 
 
 class ExpressionHistoryEntry(BaseModel):

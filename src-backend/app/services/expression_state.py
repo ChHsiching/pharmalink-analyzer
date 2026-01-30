@@ -19,6 +19,8 @@ class ExpressionState:
     current_r2: float
     pareto_equations: list[dict] = field(default_factory=list)
     variable_impact: dict[str, float] = field(default_factory=dict)
+    indicators: dict[str, float] = field(default_factory=dict)
+    target_name: str = ""
     history: list[dict] = field(default_factory=list)
     history_index: int = -1
 

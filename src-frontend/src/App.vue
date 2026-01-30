@@ -55,15 +55,15 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: #1a1a2e;
-  color: #e0e0e0;
+  background: var(--color-ink);
+  color: var(--color-hairline);
 }
 
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #333;
-  border-top: 3px solid #4fc3f7;
+  border: 3px solid var(--color-charcoal);
+  border-top: 3px solid var(--color-link-blue);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 16px;
@@ -83,10 +83,10 @@ onMounted(async () => {
 
 .loading-subtext {
   font-size: 14px;
-  color: #888;
+  color: var(--color-stone);
 }
 
 .loading-error .loading-text {
-  color: #ef5350;
+  color: var(--color-error);
 }
 </style>

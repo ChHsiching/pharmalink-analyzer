@@ -122,6 +122,8 @@ def _fake_model():
     """Return a mock gplearn model with .score() returning R2."""
     model = MagicMock()
     model.score.return_value = 0.95
+    model.predict.side_effect = lambda X: np.zeros(X.shape[0], dtype=np.float32)
+    model._program = "X0 + X1 * X2"
     return model
 
 

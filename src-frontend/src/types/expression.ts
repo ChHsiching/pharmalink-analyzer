@@ -14,6 +14,8 @@ export interface ExpressionResponse {
   pareto_count: number;
   pareto_index: number;
   variable_impact: Record<string, number>;
+  indicators: Record<string, number>;
+  target_name: string;
 }
 
 export interface ExpressionHistoryEntry {

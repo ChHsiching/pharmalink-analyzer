@@ -28,6 +28,15 @@ def _fake_pipeline_result() -> PipelineResult:
             {"sympy_expr": x0, "latex": "X_{0}", "complexity": 0, "r2_score": 0.80},
         ],
         variable_impact={"X0": 1.0, "X1": 0.8, "X2": 0.6},
+        indicators={
+            "train_r2": 0.96, "test_r2": 0.95,
+            "train_mae": 0.04, "test_mae": 0.05,
+            "train_mse": 0.005, "test_mse": 0.01,
+            "train_nmse": 0.04, "test_nmse": 0.06,
+            "train_rmse": 0.07, "test_rmse": 0.1,
+            "depth": 2.0, "length": 12.0,
+        },
+        target_name="yield",
     )
 
 

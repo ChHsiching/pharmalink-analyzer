@@ -33,6 +33,15 @@ class MockExpressionService:
                     "r2_score": 0.92,
                     "tree": {"type": "variable", "value": "x0", "children": []},
                     "variable_impact": {"x0": 1.0, "x1": 0.5},
+                    "indicators": {
+                        "train_r2": 0.95, "test_r2": 0.92,
+                        "train_mae": 0.05, "test_mae": 0.08,
+                        "train_mse": 0.01, "test_mse": 0.02,
+                        "train_nmse": 0.05, "test_nmse": 0.08,
+                        "train_rmse": 0.1, "test_rmse": 0.14,
+                        "depth": 3.0, "length": 15.0,
+                    },
+                    "target_name": "yield",
                 },
             )
         if task_id == "task_failed":
@@ -54,6 +63,15 @@ class MockExpressionService:
             r2_score=0.90,
             tree=ExpressionNode(type="variable", value="x0", children=[]),
             variable_impact={"x0": 1.0, "x1": 0.5},
+            indicators={
+                "train_r2": 0.95, "test_r2": 0.92,
+                "train_mae": 0.05, "test_mae": 0.08,
+                "train_mse": 0.01, "test_mse": 0.02,
+                "train_nmse": 0.05, "test_nmse": 0.08,
+                "train_rmse": 0.1, "test_rmse": 0.14,
+                "depth": 3.0, "length": 15.0,
+            },
+            target_name="yield",
         )
 
     def optimize(self, expr_id):
@@ -67,6 +85,15 @@ class MockExpressionService:
             r2_score=0.88,
             variable_impact={"x0": 1.0, "x1": 0.5},
             tree=ExpressionNode(type="variable", value="x0", children=[]),
+            indicators={
+                "train_r2": 0.95, "test_r2": 0.92,
+                "train_mae": 0.05, "test_mae": 0.08,
+                "train_mse": 0.01, "test_mse": 0.02,
+                "train_nmse": 0.05, "test_nmse": 0.08,
+                "train_rmse": 0.1, "test_rmse": 0.14,
+                "depth": 3.0, "length": 15.0,
+            },
+            target_name="yield",
         )
 
     def get_tree(self, expr_id):
@@ -87,6 +114,15 @@ class MockExpressionService:
                 ],
             ),
             variable_impact={"x0": 1.0, "x1": 0.5},
+            indicators={
+                "train_r2": 0.95, "test_r2": 0.92,
+                "train_mae": 0.05, "test_mae": 0.08,
+                "train_mse": 0.01, "test_mse": 0.02,
+                "train_nmse": 0.05, "test_nmse": 0.08,
+                "train_rmse": 0.1, "test_rmse": 0.14,
+                "depth": 3.0, "length": 15.0,
+            },
+            target_name="yield",
         )
 
     def get_history(self, expr_id):
@@ -116,6 +152,15 @@ class MockExpressionService:
             r2_score=0.92,
             tree=ExpressionNode(type="variable", value="x0", children=[]),
             variable_impact={"x0": 1.0, "x1": 0.5},
+            indicators={
+                "train_r2": 0.95, "test_r2": 0.92,
+                "train_mae": 0.05, "test_mae": 0.08,
+                "train_mse": 0.01, "test_mse": 0.02,
+                "train_nmse": 0.05, "test_nmse": 0.08,
+                "train_rmse": 0.1, "test_rmse": 0.14,
+                "depth": 3.0, "length": 15.0,
+            },
+            target_name="yield",
         )
 
 

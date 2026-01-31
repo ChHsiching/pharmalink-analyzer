@@ -210,11 +210,38 @@ def test_invalid_preset_defaults_to_standard():
 # ---------------------------------------------------------------------------
 
 
-def test_parsimony_coefficients_has_three_values():
-    """PARSIMONY_COEFFICIENTS should contain exactly three float values."""
-    from app.ml.symbolic_regressor import PARSIMONY_COEFFICIENTS
-    assert len(PARSIMONY_COEFFICIENTS) == 3
-    assert all(isinstance(c, (int, float)) for c in PARSIMONY_COEFFICIENTS)
+def test_parsimony_coefficients_derived_from_preset():
+    """Standard preset (0.005) should produce parsimony coefficients [0.0, 0.005, 0.02]."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_models = [
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+    ]
+    with patch("gplearn.genetic.SymbolicRegressor") as MockSR:
+        MockSR.side_effect = mock_models
+        run_pareto_regression(X, y, ["a", "b"])
+    actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
+    assert sorted(actual_parsimonies) == [0.0, 0.005, 0.02]
+
+
+def test_parsimony_coefficients_quick_preset():
+    """Quick preset (0.01) should produce parsimony coefficients [0.0, 0.01, 0.04]."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_models = [
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+    ]
+    with patch("gplearn.genetic.SymbolicRegressor") as MockSR:
+        MockSR.side_effect = mock_models
+        run_pareto_regression(X, y, ["a", "b"], preset="quick")
+    actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
+    assert sorted(actual_parsimonies) == [0.0, 0.01, 0.04]
 
 
 def test_pareto_regression_returns_three_models():
@@ -235,7 +262,7 @@ def test_pareto_regression_returns_three_models():
 
 def test_pareto_regression_uses_different_parsimony():
     """Each of the 3 runs should receive a different parsimony_coefficient."""
-    from app.ml.symbolic_regressor import run_pareto_regression, PARSIMONY_COEFFICIENTS
+    from app.ml.symbolic_regressor import run_pareto_regression
     X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
     y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
     mock_models = [
@@ -247,7 +274,7 @@ def test_pareto_regression_uses_different_parsimony():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"])
     actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
-    assert sorted(actual_parsimonies) == sorted(PARSIMONY_COEFFICIENTS)
+    assert sorted(actual_parsimonies) == [0.0, 0.005, 0.02]
 
 
 def test_pareto_regression_gplearn_missing():

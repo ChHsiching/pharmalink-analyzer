@@ -148,9 +148,6 @@ def extract_pareto_equations(model) -> list[dict]:
     return [{"index": 0, **best}]
 
 
-PARSIMONY_COEFFICIENTS = [0.0, 0.005, 0.02]
-
-
 def run_pareto_regression(X, y, feature_names, preset="standard"):
     """Run 3 gplearn symbolic regressions with different parsimony coefficients.
 
@@ -167,6 +164,8 @@ def run_pareto_regression(X, y, feature_names, preset="standard"):
     from concurrent.futures import ThreadPoolExecutor
 
     preset_params = PRESET_CONFIG.get(preset, PRESET_CONFIG["standard"])
+    base_parsimony = preset_params["parsimony_coefficient"]
+    parsimony_coefficients = [0.0, base_parsimony, base_parsimony * 4]
 
     def _fit_single(parsimony_coefficient):
         model = SymbolicRegressor(
@@ -197,7 +196,7 @@ def run_pareto_regression(X, y, feature_names, preset="standard"):
     try:
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [
-                executor.submit(_fit_single, pc) for pc in PARSIMONY_COEFFICIENTS
+                executor.submit(_fit_single, pc) for pc in parsimony_coefficients
             ]
             models = [f.result() for f in futures]
     except SymbolicRegressionError:

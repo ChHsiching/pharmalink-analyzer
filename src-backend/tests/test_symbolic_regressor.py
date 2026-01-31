@@ -167,9 +167,10 @@ def test_quick_preset_params():
 
 def test_standard_preset_params():
     cfg = PRESET_CONFIG["standard"]
-    assert cfg["population_size"] == 1000
-    assert cfg["generations"] == 60
+    assert cfg["population_size"] == 2000
+    assert cfg["generations"] == 80
     assert cfg["parsimony_coefficient"] == 0.005
+    assert cfg["init_depth"] == (4, 10)
 
 
 def test_thorough_preset_params():
@@ -200,8 +201,8 @@ def test_invalid_preset_defaults_to_standard():
     with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
         run_symbolic_regression(X, y, ["a", "b"], preset="nonexistent")
         call_kwargs = MockSR.call_args[1]
-        assert call_kwargs["population_size"] == 1000
-        assert call_kwargs["generations"] == 60
+        assert call_kwargs["population_size"] == 2000
+        assert call_kwargs["generations"] == 80
 
 
 # ---------------------------------------------------------------------------

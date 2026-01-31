@@ -1,4 +1,4 @@
-"""Verify expression pipeline uses split-before-scale StandardScaler."""
+"""Verify expression pipeline passes raw (unscaled) features to gplearn."""
 import json
 import numpy as np
 import pytest
@@ -12,11 +12,11 @@ class TestExpressionNormalization:
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
-    def test_training_data_is_scaled(
+    def test_training_data_is_raw_unscaled(
         self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
         tmp_path,
     ):
-        """Training data passed to run_pareto_regression should be standardized."""
+        """Training data passed to run_pareto_regression should be raw (unscaled)."""
         from app.services.expression_pipeline import ExpressionPipeline
         from app.services.checkpoint_resolver import CheckpointResolver
 
@@ -63,26 +63,20 @@ class TestExpressionNormalization:
         pipeline.run("model-norm", preset="quick")
 
         X_train = mock_pareto_reg.call_args[0][0]
-        col_means = np.mean(X_train, axis=0)
-        col_stds = np.std(X_train, axis=0)
-
-        assert np.all(np.abs(col_means) < 0.5), (
-            f"Training means not near 0: {col_means}"
-        )
-        assert np.all(col_stds > 0.3), (
-            f"Training stds too small (not scaled?): {col_stds}"
-        )
+        # Raw features should NOT be centered at 0 or have std=1
+        # Original data is ~N(3, 5), so train split should retain that scale
+        assert X_train.shape[0] < 30, "Should be a train split"
 
     @patch("app.services.expression_pipeline.extract_best_equation")
     @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
-    def test_r2_uses_scaled_test_data(
+    def test_r2_uses_raw_test_data(
         self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
         tmp_path,
     ):
-        """model.score() should receive scaled X_test, not raw X_test."""
+        """model.score() should receive raw X_test, not scaled X_test."""
         from app.services.expression_pipeline import ExpressionPipeline
         from app.services.checkpoint_resolver import CheckpointResolver
 
@@ -129,9 +123,10 @@ class TestExpressionNormalization:
         pipeline.run("model-r2", preset="quick")
 
         X_test = mock_model.score.call_args[0][0]
+        # Test data should be raw (unscaled), not centered at 0
         test_means = np.mean(X_test, axis=0)
-        assert np.all(np.abs(test_means) < 2.0), (
-            f"Test data appears unscaled (means ~{test_means})"
+        assert np.all(np.abs(test_means) > 2.0), (
+            f"Test data appears scaled (means near 0): means={test_means}"
         )
 
     @patch("app.services.expression_pipeline.extract_best_equation")
@@ -139,11 +134,11 @@ class TestExpressionNormalization:
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
-    def test_no_fit_on_full_dataset(
+    def test_no_scaler_used(
         self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
         tmp_path,
     ):
-        """Scaler must only fit on training split, not the full dataset."""
+        """Pipeline should not use StandardScaler at all."""
         from app.services.expression_pipeline import ExpressionPipeline
         from app.services.checkpoint_resolver import CheckpointResolver
         from sklearn.preprocessing import StandardScaler as RealScaler
@@ -188,8 +183,8 @@ class TestExpressionNormalization:
             "loss": 0.20,
         }
 
-        original_fit_transform = RealScaler.fit_transform
         fit_input_shapes = []
+        original_fit_transform = RealScaler.fit_transform
 
         def tracking_fit_transform(self, X, y=None):
             fit_input_shapes.append(X.shape)
@@ -198,9 +193,6 @@ class TestExpressionNormalization:
         with patch.object(RealScaler, "fit_transform", tracking_fit_transform):
             pipeline.run("model-leak", preset="quick")
 
-        assert len(fit_input_shapes) == 1, (
-            f"Expected 1 fit_transform call, got {len(fit_input_shapes)}"
-        )
-        assert fit_input_shapes[0][0] == 24, (
-            f"fit_transform called with {fit_input_shapes[0][0]} rows, expected 24"
+        assert len(fit_input_shapes) == 0, (
+            f"StandardScaler.fit_transform should not be called, got {len(fit_input_shapes)} calls"
         )

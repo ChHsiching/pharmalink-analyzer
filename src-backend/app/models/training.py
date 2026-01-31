@@ -11,11 +11,11 @@ class TrainingConfig(BaseModel):
     dataset_id: str
     d_model: int = 64
     n_heads: int = 4
-    n_layers: int = 2
+    n_layers: int = 3
     dropout: float = 0.1
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
-    epochs: int = 100
+    epochs: int = 150
     k_folds: int = 5
     k_fold_shuffle: bool = True
     k_fold_seed: int = 42

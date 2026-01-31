@@ -91,8 +91,8 @@ def _fake_attention_matrix(n=3):
 
 def _fake_pairs():
     return [
-        {"source": "A", "target": "B", "weight": 0.9, "classification": "synergistic"},
-        {"source": "B", "target": "C", "weight": 0.7, "classification": "synergistic"},
+        {"source": "A", "target": "B", "weight": 0.9},
+        {"source": "B", "target": "C", "weight": 0.7},
     ]
 
 
@@ -174,23 +174,25 @@ class TestPipelineResult:
 # ---------------------------------------------------------------------------
 
 class TestPipelineRun:
+    @patch("app.services.expression_pipeline.compute_impact")
     @patch("app.services.expression_pipeline.extract_best_equation")
     @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_run_returns_pipeline_result(
-        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best, mock_impact,
         pipeline, checkpoint_dir,
     ):
         _write_checkpoint(checkpoint_dir)
         mock_attn.return_value = _fake_attention_matrix()
         mock_pairs.return_value = (_fake_pairs(), 0.5)
         mock_interact.return_value = (
-            np.zeros((20, 7)),
-            ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
+            np.zeros((20, 5)),
+            ["A", "B", "C", "A_mul_B", "B_mul_C"],
         )
         _setup_pareto_mocks(mock_pareto_reg, mock_best)
+        mock_impact.return_value = {"A": 0.5, "B": 0.3, "C": 0.2}
 
         result = pipeline.run("model-abc")
 
@@ -215,13 +217,14 @@ class TestPipelineRun:
         with pytest.raises(DatasetNotFoundError):
             pipeline.run("model-abc")
 
+    @patch("app.services.expression_pipeline.compute_impact")
     @patch("app.services.expression_pipeline.extract_best_equation")
     @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_uses_train_test_split_for_r2(
-        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best, mock_impact,
         pipeline, checkpoint_dir,
     ):
         """Verify the pipeline splits data into train/test before fitting and scoring.
@@ -233,10 +236,11 @@ class TestPipelineRun:
         mock_attn.return_value = _fake_attention_matrix()
         mock_pairs.return_value = (_fake_pairs(), 0.5)
         mock_interact.return_value = (
-            np.zeros((20, 7)),
-            ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
+            np.zeros((20, 5)),
+            ["A", "B", "C", "A_mul_B", "B_mul_C"],
         )
         mock_models = _setup_pareto_mocks(mock_pareto_reg, mock_best)
+        mock_impact.return_value = {"A": 0.5, "B": 0.3, "C": 0.2}
 
         pipeline.run("model-abc")
 
@@ -256,46 +260,50 @@ class TestPipelineRun:
             f"train ({X_train.shape[0]}) + test ({X_test.shape[0]}) != 20"
         )
 
+    @patch("app.services.expression_pipeline.compute_impact")
     @patch("app.services.expression_pipeline.extract_best_equation")
     @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_run_forwards_preset_to_regressor(
-        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best, mock_impact,
         pipeline, checkpoint_dir,
     ):
         _write_checkpoint(checkpoint_dir)
         mock_attn.return_value = _fake_attention_matrix()
         mock_pairs.return_value = (_fake_pairs(), 0.5)
         mock_interact.return_value = (
-            np.zeros((20, 7)),
-            ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
+            np.zeros((20, 5)),
+            ["A", "B", "C", "A_mul_B", "B_mul_C"],
         )
         _setup_pareto_mocks(mock_pareto_reg, mock_best)
+        mock_impact.return_value = {"A": 0.5, "B": 0.3, "C": 0.2}
 
         pipeline.run("model-abc", preset="quick")
 
         mock_pareto_reg.assert_called_once()
         assert mock_pareto_reg.call_args[1]["preset"] == "quick"
 
+    @patch("app.services.expression_pipeline.compute_impact")
     @patch("app.services.expression_pipeline.extract_best_equation")
     @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_run_uses_pareto_regression(
-        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best, mock_impact,
         pipeline, checkpoint_dir,
     ):
         _write_checkpoint(checkpoint_dir)
         mock_attn.return_value = _fake_attention_matrix()
         mock_pairs.return_value = (_fake_pairs(), 0.5)
         mock_interact.return_value = (
-            np.zeros((20, 7)),
-            ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
+            np.zeros((20, 5)),
+            ["A", "B", "C", "A_mul_B", "B_mul_C"],
         )
         _setup_pareto_mocks(mock_pareto_reg, mock_best)
+        mock_impact.return_value = {"A": 0.5, "B": 0.3, "C": 0.2}
 
         result = pipeline.run("model-abc")
 
@@ -304,6 +312,37 @@ class TestPipelineRun:
         for eq in result.pareto_equations:
             assert "r2_score" in eq
         assert result.complexity == 7
+
+    @patch("app.services.expression_pipeline.compute_impact")
+    @patch("app.services.expression_pipeline.extract_best_equation")
+    @patch("app.services.expression_pipeline.run_pareto_regression")
+    @patch("app.services.expression_pipeline.generate_interaction_features")
+    @patch("app.services.expression_pipeline.extract_top_pairs")
+    @patch("app.services.expression_pipeline.extract_attention_weights")
+    def test_run_passes_raw_features_to_regressor(
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best, mock_impact,
+        pipeline, checkpoint_dir,
+    ):
+        """gplearn should receive raw (unscaled) features, not StandardScaler output."""
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.return_value = (
+            np.ones((20, 5)),
+            ["A", "B", "C", "A_mul_B", "B_mul_C"],
+        )
+        _setup_pareto_mocks(mock_pareto_reg, mock_best)
+        mock_impact.return_value = {"A": 0.5, "B": 0.3, "C": 0.2}
+
+        pipeline.run("model-abc")
+
+        X_received = mock_pareto_reg.call_args[0][0]
+        # Raw features: train split from 20 rows of ones (not scaled to mean=0, std=1)
+        assert X_received.shape[0] < 20
+        # If scaled, means would be ~0 and stds ~1; raw ones should have different stats
+        assert np.all(np.abs(X_received.mean(axis=0) - 1.0) < 0.5), (
+            f"Features appear scaled (mean ~0): mean={X_received.mean(axis=0)}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -345,21 +384,22 @@ class TestPipelineErrorWrapping:
         with pytest.raises(SymbolicRegressionError):
             pipeline.run("model-abc")
 
+    @patch("app.services.expression_pipeline.compute_impact")
     @patch("app.services.expression_pipeline.extract_best_equation")
     @patch("app.services.expression_pipeline.run_pareto_regression")
     @patch("app.services.expression_pipeline.generate_interaction_features")
     @patch("app.services.expression_pipeline.extract_top_pairs")
     @patch("app.services.expression_pipeline.extract_attention_weights")
     def test_wraps_equation_extraction_error(
-        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best,
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best, mock_impact,
         pipeline, checkpoint_dir,
     ):
         _write_checkpoint(checkpoint_dir)
         mock_attn.return_value = _fake_attention_matrix()
         mock_pairs.return_value = (_fake_pairs(), 0.5)
         mock_interact.return_value = (
-            np.zeros((20, 7)),
-            ["A", "B", "C", "A_mul_B", "A_div_B", "B_mul_C", "B_div_C"],
+            np.zeros((20, 5)),
+            ["A", "B", "C", "A_mul_B", "B_mul_C"],
         )
         mock_models = [_fake_model(), _fake_model(), _fake_model()]
         mock_pareto_reg.return_value = mock_models

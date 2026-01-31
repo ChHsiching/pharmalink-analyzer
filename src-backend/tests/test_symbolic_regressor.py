@@ -33,15 +33,17 @@ def test_interaction_features_shape(interaction_data):
     X, names, pairs = interaction_data
     X_aug, aug_names = generate_interaction_features(X, names, pairs)
     assert X_aug.shape[0] == 30
-    assert X_aug.shape[1] == 9
-    assert len(aug_names) == 9
+    assert X_aug.shape[1] == 7
+    assert len(aug_names) == 7
 
 
 def test_interaction_features_names(interaction_data):
     X, names, pairs = interaction_data
     _, aug_names = generate_interaction_features(X, names, pairs)
     assert "f0_mul_f1" in aug_names
-    assert "f0_div_f1" in aug_names
+    assert "f2_mul_f3" in aug_names
+    # div interaction features removed (Issue #62)
+    assert all("_div_" not in n for n in aug_names)
 
 
 def test_interaction_features_values(interaction_data):
@@ -165,9 +167,10 @@ def test_quick_preset_params():
 
 def test_standard_preset_params():
     cfg = PRESET_CONFIG["standard"]
-    assert cfg["population_size"] == 1000
-    assert cfg["generations"] == 60
+    assert cfg["population_size"] == 2000
+    assert cfg["generations"] == 80
     assert cfg["parsimony_coefficient"] == 0.005
+    assert cfg["init_depth"] == (4, 10)
 
 
 def test_thorough_preset_params():
@@ -198,8 +201,8 @@ def test_invalid_preset_defaults_to_standard():
     with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
         run_symbolic_regression(X, y, ["a", "b"], preset="nonexistent")
         call_kwargs = MockSR.call_args[1]
-        assert call_kwargs["population_size"] == 1000
-        assert call_kwargs["generations"] == 60
+        assert call_kwargs["population_size"] == 2000
+        assert call_kwargs["generations"] == 80
 
 
 # ---------------------------------------------------------------------------
@@ -207,11 +210,38 @@ def test_invalid_preset_defaults_to_standard():
 # ---------------------------------------------------------------------------
 
 
-def test_parsimony_coefficients_has_three_values():
-    """PARSIMONY_COEFFICIENTS should contain exactly three float values."""
-    from app.ml.symbolic_regressor import PARSIMONY_COEFFICIENTS
-    assert len(PARSIMONY_COEFFICIENTS) == 3
-    assert all(isinstance(c, (int, float)) for c in PARSIMONY_COEFFICIENTS)
+def test_parsimony_coefficients_derived_from_preset():
+    """Standard preset (0.005) should produce parsimony coefficients [0.0, 0.005, 0.02]."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_models = [
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+    ]
+    with patch("gplearn.genetic.SymbolicRegressor") as MockSR:
+        MockSR.side_effect = mock_models
+        run_pareto_regression(X, y, ["a", "b"])
+    actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
+    assert sorted(actual_parsimonies) == [0.0, 0.005, 0.02]
+
+
+def test_parsimony_coefficients_quick_preset():
+    """Quick preset (0.01) should produce parsimony coefficients [0.0, 0.01, 0.04]."""
+    from app.ml.symbolic_regressor import run_pareto_regression
+    X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
+    y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    mock_models = [
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+        _make_mock_model("add(X0, X1)", ["a", "b"]),
+    ]
+    with patch("gplearn.genetic.SymbolicRegressor") as MockSR:
+        MockSR.side_effect = mock_models
+        run_pareto_regression(X, y, ["a", "b"], preset="quick")
+    actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
+    assert sorted(actual_parsimonies) == [0.0, 0.01, 0.04]
 
 
 def test_pareto_regression_returns_three_models():
@@ -232,7 +262,7 @@ def test_pareto_regression_returns_three_models():
 
 def test_pareto_regression_uses_different_parsimony():
     """Each of the 3 runs should receive a different parsimony_coefficient."""
-    from app.ml.symbolic_regressor import run_pareto_regression, PARSIMONY_COEFFICIENTS
+    from app.ml.symbolic_regressor import run_pareto_regression
     X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
     y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
     mock_models = [
@@ -244,7 +274,7 @@ def test_pareto_regression_uses_different_parsimony():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"])
     actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
-    assert sorted(actual_parsimonies) == sorted(PARSIMONY_COEFFICIENTS)
+    assert sorted(actual_parsimonies) == [0.0, 0.005, 0.02]
 
 
 def test_pareto_regression_gplearn_missing():

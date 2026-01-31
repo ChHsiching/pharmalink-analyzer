@@ -13,8 +13,7 @@ def generate_interaction_features(
 ) -> tuple[np.ndarray, list[str]]:
     """Augment feature matrix with interaction terms from top attention pairs.
 
-    Synergistic pairs (strong association): mul + div (2 features).
-    Antagonistic pairs (weak association): mul only (1 feature).
+    All pairs: mul only (1 feature per pair).
     """
     if not top_pairs:
         return X.copy(), list(feature_names)
@@ -26,10 +25,6 @@ def generate_interaction_features(
         j = feature_names.index(pair["target"])
         interaction_cols.append(X[:, i] * X[:, j])
         interaction_names.append(f"{pair['source']}_mul_{pair['target']}")
-        if pair.get("classification") == "synergistic":
-            safe_j = np.where(np.abs(X[:, j]) < 1e-8, 1e-8, X[:, j])
-            interaction_cols.append(X[:, i] / safe_j)
-            interaction_names.append(f"{pair['source']}_div_{pair['target']}")
 
     X_interactions = np.column_stack(interaction_cols).astype(np.float32)
     return np.hstack([X, X_interactions]), list(feature_names) + interaction_names
@@ -90,7 +85,7 @@ def _parse(tokens: list[str], pos: int, var_map: dict) -> tuple:
 
 PRESET_CONFIG = {
     "quick": {"population_size": 500, "generations": 30, "parsimony_coefficient": 0.01, "init_depth": (2, 8), "const_range": (-2.0, 2.0)},
-    "standard": {"population_size": 1000, "generations": 60, "parsimony_coefficient": 0.005, "init_depth": (2, 8), "const_range": (-2.0, 2.0)},
+    "standard": {"population_size": 2000, "generations": 80, "parsimony_coefficient": 0.005, "init_depth": (4, 10), "const_range": (-2.0, 2.0)},
     "thorough": {"population_size": 2000, "generations": 100, "parsimony_coefficient": 0.001, "init_depth": (2, 8), "const_range": (-2.0, 2.0)},
 }
 
@@ -153,9 +148,6 @@ def extract_pareto_equations(model) -> list[dict]:
     return [{"index": 0, **best}]
 
 
-PARSIMONY_COEFFICIENTS = [0.0, 0.005, 0.02]
-
-
 def run_pareto_regression(X, y, feature_names, preset="standard"):
     """Run 3 gplearn symbolic regressions with different parsimony coefficients.
 
@@ -172,6 +164,8 @@ def run_pareto_regression(X, y, feature_names, preset="standard"):
     from concurrent.futures import ThreadPoolExecutor
 
     preset_params = PRESET_CONFIG.get(preset, PRESET_CONFIG["standard"])
+    base_parsimony = preset_params["parsimony_coefficient"]
+    parsimony_coefficients = [0.0, base_parsimony, base_parsimony * 4]
 
     def _fit_single(parsimony_coefficient):
         model = SymbolicRegressor(
@@ -202,7 +196,7 @@ def run_pareto_regression(X, y, feature_names, preset="standard"):
     try:
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [
-                executor.submit(_fit_single, pc) for pc in PARSIMONY_COEFFICIENTS
+                executor.submit(_fit_single, pc) for pc in parsimony_coefficients
             ]
             models = [f.result() for f in futures]
     except SymbolicRegressionError:

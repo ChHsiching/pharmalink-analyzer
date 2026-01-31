@@ -130,7 +130,7 @@ const {
   updateTarget,
 } = useDatasets();
 
-const { markDatasetsAvailable } = useWorkflow();
+const { markDatasetsAvailable, markTargetSelected } = useWorkflow();
 const datasets = ref<DatasetMeta[]>([]);
 const selected = ref<DatasetDetail | null>(null);
 const stats = ref<DatasetStatsResponse | null>(null);
@@ -165,6 +165,7 @@ async function selectDataset(id: string) {
   try {
     selected.value = await getDataset(id);
     stats.value = await getDatasetStats(id);
+    markTargetSelected(!!selected.value?.target);
   } catch {
     error.value = "加载数据集失败";
   }
@@ -209,6 +210,7 @@ async function handleTargetChange(event: Event) {
   try {
     const updated = await updateTarget(selected.value.id, newTarget);
     await selectDataset(updated.id);
+    markTargetSelected(true);
   } catch {
     error.value = "切换目标变量失败";
   }

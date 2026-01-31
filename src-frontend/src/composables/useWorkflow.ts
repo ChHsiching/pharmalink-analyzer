@@ -31,6 +31,7 @@ export const TAB_LABELS: Record<TabName, string> = {
 
 const state = reactive({
   datasetsAvailable: false,
+  targetSelected: false,
   hasCheckpoint: false,
   currentExprId: "",
 });
@@ -38,7 +39,7 @@ const state = reactive({
 export function useWorkflow() {
   const tabEnabled = computed<Record<TabName, boolean>>(() => ({
     "data-import": true,
-    training: state.datasetsAvailable,
+    training: state.datasetsAvailable && state.targetSelected,
     analysis: state.hasCheckpoint,
     expression: state.hasCheckpoint,
     evaluation: state.hasCheckpoint,
@@ -55,6 +56,10 @@ export function useWorkflow() {
 
   function markCurrentExpression(exprId: string) {
     state.currentExprId = exprId;
+  }
+
+  function markTargetSelected(selected: boolean) {
+    state.targetSelected = selected;
   }
 
   async function init() {
@@ -82,6 +87,7 @@ export function useWorkflow() {
     markDatasetsAvailable,
     markHasCheckpoint,
     markCurrentExpression,
+    markTargetSelected,
     init,
   };
 }

@@ -1,5 +1,6 @@
 """FormulationService — orchestrates state lookup, attention extraction, and formulation."""
 
+import numpy as np
 import torch
 
 from app.exceptions import ExpressionNotFoundError
@@ -9,6 +10,24 @@ from app.ml.formulator import formulate
 from app.models.formulation import FormulationCandidate, FormulationResponse
 from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.expression_state import ExpressionStateManager
+
+
+def _check_attention_weak(attention: dict[str, float], threshold: float = 2.0) -> bool:
+    values = list(attention.values())
+    if not values:
+        return True
+    min_w = min(values)
+    if min_w <= 0:
+        return True
+    return (max(values) / min_w) < threshold
+
+
+def _softmax_rescue(attention: dict[str, float], temperature: float = 5.0) -> dict[str, float]:
+    names = list(attention.keys())
+    logits = np.array([attention[n] for n in names]) * temperature
+    exp_logits = np.exp(logits - logits.max())
+    softmax_weights = exp_logits / exp_logits.sum()
+    return {name: float(w) for name, w in zip(names, softmax_weights)}
 
 
 class FormulationService:
@@ -30,6 +49,11 @@ class FormulationService:
         # avg_attn is (n_features, n_features) matrix; per-feature attention = row mean
         per_feature_attn = avg_attn.mean(axis=1)
         attn_dict = {name: float(per_feature_attn[i]) for i, name in enumerate(feature_names)}
+
+        attention_weak = _check_attention_weak(attn_dict)
+        if attention_weak:
+            attn_dict = _softmax_rescue(attn_dict, temperature=5.0)
+
         pairs, _ = extract_top_pairs(avg_attn, feature_names, top_k=len(feature_names))
 
         result = formulate(
@@ -46,4 +70,5 @@ class FormulationService:
             candidates=candidates,
             feature_names=result["feature_names"],
             attention_weights=result["attention_weights"],
+            attention_weak=attention_weak,
         )

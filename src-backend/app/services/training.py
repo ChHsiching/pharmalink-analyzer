@@ -65,6 +65,13 @@ class TrainingService:
             raise ValueError(f"Dataset '{config.dataset_id}' not found")
 
         meta = self._data_loader.get_dataset(config.dataset_id)
+        if meta is None:
+            raise ValueError(f"Dataset '{config.dataset_id}' not found")
+        if not meta.target:
+            raise ValueError(
+                f"Dataset '{config.dataset_id}' has no target variable selected. "
+                "Select a target variable before training."
+            )
         self._task_id = uuid.uuid4().hex[:8]
         self._config = config
         self._status = "running"

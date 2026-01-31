@@ -19,7 +19,10 @@ async def start_training(
         task_id = await training_service.start_training(config)
         return {"task_id": task_id, "status": "started"}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        msg = str(e)
+        if "target variable" in msg:
+            raise HTTPException(status_code=422, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
 
 
 @router.get("/train/status", response_model=TrainingStatusResponse)

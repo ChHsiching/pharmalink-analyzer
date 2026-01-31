@@ -107,3 +107,40 @@ async def test_list_checkpoints_empty(client):
 async def test_load_checkpoint_not_found(client):
     resp = await client.post("/api/v1/models/checkpoints/load?checkpoint_id=nonexistent")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_start_training_no_target_variable(client, csv_dir):
+    """Training should return 422 when dataset has no target variable selected."""
+    # Load a dataset, then replace it with one that has an empty target
+    rng = np.random.default_rng(99)
+    n, cols = 5, 3
+    data = rng.standard_normal((n, cols + 1)).astype(np.float32)
+    header = "A,B,C,D\n"
+    rows = "\n".join(",".join(f"{v:.4f}" for v in row) for row in data) + "\n"
+    (csv_dir / "no-target.csv").write_text(header + rows)
+
+    from app.services.data_loader import DataLoader as DL
+    dl = DataLoader(data_dir=csv_dir)
+    dl.load_preset_datasets()
+    # Manually set target to empty string to simulate "not selected"
+    meta, df = dl._datasets["no-target"]
+    dl._datasets["no-target"] = (meta.model_copy(update={"target": ""}), df)
+
+    # Register in global data_loader so TrainingService sees it
+    data_loader._datasets["no-target"] = dl._datasets["no-target"]
+
+    # Re-create training service with updated data_loader
+    svc = TrainingService(checkpoint_dir=csv_dir / "ckpts2", data_loader=data_loader)
+    svc._status = "idle"
+    svc._progress = []
+    app.dependency_overrides[get_training_service] = lambda: svc
+
+    resp = await client.post("/api/v1/models/train", json={
+        "dataset_id": "no-target",
+    })
+    assert resp.status_code == 422
+    assert "target variable" in resp.json()["detail"]
+
+    # Cleanup
+    del data_loader._datasets["no-target"]

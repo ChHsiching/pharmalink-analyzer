@@ -15,4 +15,5 @@ export interface FormulationResponse {
   candidates: FormulationCandidate[];
   feature_names: string[];
   attention_weights: Record<string, number>;
+  attention_weak?: boolean;
 }

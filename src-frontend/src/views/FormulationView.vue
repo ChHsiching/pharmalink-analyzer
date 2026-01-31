@@ -48,6 +48,10 @@
       <div v-if="loading" class="status">寻优计算中...</div>
       <div v-else-if="error" class="error">{{ error }}</div>
 
+      <div v-if="result?.attention_weak" class="warning-banner">
+        注意力权重过于均匀，结果已通过 softmax 增强。建议增加训练层数或训练轮次以获得更显著的注意力分布。
+      </div>
+
       <template v-if="result">
         <div class="section">
           <h3>注意力权重</h3>
@@ -260,6 +264,16 @@ h3 {
 
 .status {
   color: var(--color-steel);
+}
+
+.warning-banner {
+  padding: 10px 14px;
+  background: var(--color-tint-sky);
+  border-left: 3px solid var(--color-link-blue);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--color-charcoal);
 }
 
 .error {

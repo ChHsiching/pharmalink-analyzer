@@ -33,15 +33,17 @@ def test_interaction_features_shape(interaction_data):
     X, names, pairs = interaction_data
     X_aug, aug_names = generate_interaction_features(X, names, pairs)
     assert X_aug.shape[0] == 30
-    assert X_aug.shape[1] == 9
-    assert len(aug_names) == 9
+    assert X_aug.shape[1] == 7
+    assert len(aug_names) == 7
 
 
 def test_interaction_features_names(interaction_data):
     X, names, pairs = interaction_data
     _, aug_names = generate_interaction_features(X, names, pairs)
     assert "f0_mul_f1" in aug_names
-    assert "f0_div_f1" in aug_names
+    assert "f2_mul_f3" in aug_names
+    # div interaction features removed (Issue #62)
+    assert all("_div_" not in n for n in aug_names)
 
 
 def test_interaction_features_values(interaction_data):

@@ -13,8 +13,7 @@ def generate_interaction_features(
 ) -> tuple[np.ndarray, list[str]]:
     """Augment feature matrix with interaction terms from top attention pairs.
 
-    Synergistic pairs (strong association): mul + div (2 features).
-    Antagonistic pairs (weak association): mul only (1 feature).
+    All pairs: mul only (1 feature per pair).
     """
     if not top_pairs:
         return X.copy(), list(feature_names)
@@ -26,10 +25,6 @@ def generate_interaction_features(
         j = feature_names.index(pair["target"])
         interaction_cols.append(X[:, i] * X[:, j])
         interaction_names.append(f"{pair['source']}_mul_{pair['target']}")
-        if pair.get("classification") == "synergistic":
-            safe_j = np.where(np.abs(X[:, j]) < 1e-8, 1e-8, X[:, j])
-            interaction_cols.append(X[:, i] / safe_j)
-            interaction_names.append(f"{pair['source']}_div_{pair['target']}")
 
     X_interactions = np.column_stack(interaction_cols).astype(np.float32)
     return np.hstack([X, X_interactions]), list(feature_names) + interaction_names

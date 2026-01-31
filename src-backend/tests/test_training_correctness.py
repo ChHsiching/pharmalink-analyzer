@@ -55,3 +55,15 @@ class TestAugmentation:
         X_aug, y_aug = augment(X, y, config)
         np.testing.assert_array_equal(X_aug, X)
         np.testing.assert_array_equal(y_aug, y)
+
+
+class TestTrainingConfigDefaults:
+    def test_default_n_layers_is_3(self):
+        from app.models.training import TrainingConfig
+        config = TrainingConfig(dataset_id="test")
+        assert config.n_layers == 3
+
+    def test_default_epochs_is_150(self):
+        from app.models.training import TrainingConfig
+        config = TrainingConfig(dataset_id="test")
+        assert config.epochs == 150

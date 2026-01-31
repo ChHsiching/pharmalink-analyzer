@@ -67,3 +67,59 @@ def test_formulate_response_has_attention_weak_field(mock_deps):
     result = mock_deps.formulate("expr_test", top_k=3, n_samples=100)
     assert hasattr(result, "attention_weak")
     assert isinstance(result.attention_weak, bool)
+
+
+def test_uniform_attention_triggers_rescue(mock_deps):
+    """When all attention weights are identical (uniform), attention_weak=True."""
+    result = mock_deps.formulate("expr_test", top_k=3, n_samples=100)
+    assert result.attention_weak is True
+
+
+def test_differentiated_attention_no_rescue():
+    """When max/min > 2.0, attention_weak=False and weights unchanged."""
+    from unittest.mock import MagicMock, patch
+
+    state_manager = MagicMock()
+    state_manager.get.return_value = _fake_state()
+
+    resolver = MagicMock()
+    features = np.array([[1.0, 2.0], [3.0, 4.0]])
+    resolver.get_features.return_value = (features, ["X0", "X1"])
+    config_mock = MagicMock()
+    config_mock.n_features = 2
+    config_mock.dataset_id = "ds_test"
+    resolver.resolve.return_value = (MagicMock(), config_mock)
+
+    mock_model = MagicMock()
+    diff_attn = torch.tensor([[[0.9, 0.1], [0.1, 0.3]]])
+    mock_model.return_value = (torch.ones(2), diff_attn)
+
+    with patch("app.services.formulation.load_model", return_value=mock_model), \
+         patch("app.services.formulation.extract_top_pairs") as mock_pairs:
+        mock_pairs.return_value = (
+            [{"source": "X0", "target": "X1", "weight": 0.8, "classification": "synergistic"}], 50.0
+        )
+        service = FormulationService(state_manager=state_manager, resolver=resolver)
+        result = service.formulate("expr_test", top_k=3, n_samples=100)
+
+    assert result.attention_weak is False
+
+
+def test_softmax_rescue_produces_valid_distribution():
+    """Softmax output sums to 1.0 and preserves keys."""
+    from app.services.formulation import _softmax_rescue
+
+    uniform = {"X0": 0.5, "X1": 0.5, "X2": 0.5}
+    result = _softmax_rescue(uniform, temperature=5.0)
+    values = list(result.values())
+    assert abs(sum(values) - 1.0) < 1e-6
+    assert set(result.keys()) == {"X0", "X1", "X2"}
+
+
+def test_softmax_rescue_amplifies_skewed_input():
+    """Even with skewed input, softmax preserves order with high temperature."""
+    from app.services.formulation import _softmax_rescue
+
+    skewed = {"X0": 0.7, "X1": 0.2, "X2": 0.1}
+    result = _softmax_rescue(skewed, temperature=5.0)
+    assert result["X0"] > result["X1"] > result["X2"]

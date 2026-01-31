@@ -1,8 +1,9 @@
 :root {
   /* === Brand & Primary === */
-  --color-primary: #5645d4;
-  --color-primary-pressed: #4534b3;
-  --color-primary-deep: #3a2a99;
+  --color-primary: #3d8b7a;
+  --color-primary-pressed: #2d6e5f;
+  --color-primary-deep: #1a5c4c;
+  --color-primary-tint: #e8f5f0;
   --color-on-primary: #ffffff;
 
   /* === Semantic === */

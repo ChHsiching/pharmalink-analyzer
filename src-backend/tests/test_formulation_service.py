@@ -60,3 +60,10 @@ def test_formulate_expression_not_found(mock_deps):
     mock_deps._state_manager.get.side_effect = ExpressionNotFoundError("expr_bad")
     with pytest.raises(ExpressionNotFoundError):
         mock_deps.formulate("expr_bad")
+
+
+def test_formulate_response_has_attention_weak_field(mock_deps):
+    """FormulationResponse must include attention_weak boolean flag."""
+    result = mock_deps.formulate("expr_test", top_k=3, n_samples=100)
+    assert hasattr(result, "attention_weak")
+    assert isinstance(result.attention_weak, bool)

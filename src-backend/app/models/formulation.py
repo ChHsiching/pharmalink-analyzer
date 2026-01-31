@@ -20,3 +20,4 @@ class FormulationResponse(BaseModel):
     candidates: list[FormulationCandidate]
     feature_names: list[str]
     attention_weights: dict[str, float]
+    attention_weak: bool = False

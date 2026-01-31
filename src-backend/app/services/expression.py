@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
 from app.exceptions import ExpressionTaskNotFoundError
@@ -27,10 +28,11 @@ class ExpressionService:
         resolver: CheckpointResolver,
         pipeline: ExpressionPipeline | None = None,
         state_manager: ExpressionStateManager | None = None,
+        checkpoint_dir: Path | None = None,
     ):
         self._resolver = resolver
         self._pipeline = pipeline or ExpressionPipeline(resolver)
-        self._state = state_manager or ExpressionStateManager()
+        self._state = state_manager or ExpressionStateManager(checkpoint_dir=checkpoint_dir)
         self._tasks: dict[str, dict[str, Any]] = {}
         self._tasks_lock = threading.Lock()
 

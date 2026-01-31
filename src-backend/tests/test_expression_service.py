@@ -1,6 +1,7 @@
 """Tests for ExpressionService — validates facade orchestration."""
 
 import time
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -284,3 +285,23 @@ class TestTTLTaskCleanup:
         }
         service._cleanup_stale_tasks(ttl_seconds=1800)
         assert running_task_id in service._tasks
+
+
+class TestPersistenceIntegration:
+    """Verify that ExpressionService with checkpoint_dir persists across restarts."""
+
+    def test_generate_persists_across_service_restart(self, tmp_path, mock_pipeline):
+        resolver = MagicMock()
+        svc1 = ExpressionService(
+            resolver=resolver, pipeline=mock_pipeline, checkpoint_dir=tmp_path,
+        )
+        result = svc1.generate("model-abc")
+        expr_id = result.expr_id
+
+        # Fresh service with same checkpoint_dir should recover state
+        svc2 = ExpressionService(
+            resolver=resolver, pipeline=mock_pipeline, checkpoint_dir=tmp_path,
+        )
+        tree = svc2.get_tree(expr_id)
+        assert tree.expr_id == expr_id
+        assert tree.latex == result.latex

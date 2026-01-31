@@ -195,3 +195,81 @@ class TestStateManagerGetHistory:
         mgr = ExpressionStateManager()
         with pytest.raises(ExpressionNotFoundError):
             mgr.get_history_entries("no_such_id")
+
+
+# ---------------------------------------------------------------------------
+# TestStateManagerPersistence
+# ---------------------------------------------------------------------------
+
+
+class TestStateManagerPersistence:
+
+    def test_put_saves_to_disk(self, tmp_path):
+        """put() should write expression_state.json"""
+        mgr = ExpressionStateManager(checkpoint_dir=tmp_path)
+        state = _make_state()
+        mgr.put(state)
+        assert (tmp_path / "model_1" / "expression_state.json").exists()
+
+    def test_load_restores_from_disk(self, tmp_path):
+        """Fresh manager should load state from disk"""
+        mgr1 = ExpressionStateManager(checkpoint_dir=tmp_path)
+        state = _make_state()
+        mgr1.put(state)
+
+        mgr2 = ExpressionStateManager(checkpoint_dir=tmp_path)
+        restored = mgr2.get("expr_test")
+        assert restored.expr_id == "expr_test"
+        assert restored.current_latex == "x"
+
+    def test_get_raises_not_found_for_missing(self, tmp_path):
+        mgr = ExpressionStateManager(checkpoint_dir=tmp_path)
+        with pytest.raises(ExpressionNotFoundError):
+            mgr.get("nonexistent")
+
+    def test_history_preserved_across_restart(self, tmp_path):
+        mgr1 = ExpressionStateManager(checkpoint_dir=tmp_path)
+        state = _make_state_with_history()
+        mgr1.put(state)
+
+        mgr2 = ExpressionStateManager(checkpoint_dir=tmp_path)
+        restored = mgr2.get("expr_test")
+        assert len(restored.history) == 2
+
+    def test_sympy_round_trip(self, tmp_path):
+        """Complex SymPy expressions should round-trip through str/sympify"""
+        mgr1 = ExpressionStateManager(checkpoint_dir=tmp_path)
+        a, b = sympy.symbols("a b")
+        expr = a**2 + b * 3.5
+        state = ExpressionState(
+            expr_id="expr_rt",
+            model_id="model_1",
+            current_sympy=expr,
+            current_latex=sympy.latex(expr),
+            current_complexity=5,
+            current_r2=0.8,
+        )
+        mgr1.put(state)
+
+        mgr2 = ExpressionStateManager(checkpoint_dir=tmp_path)
+        restored = mgr2.get("expr_rt")
+        assert sympy.simplify(restored.current_sympy - expr) == 0
+
+    def test_undo_persists_to_disk(self, tmp_path):
+        """undo() should persist the restored state"""
+        mgr1 = ExpressionStateManager(checkpoint_dir=tmp_path)
+        state = _make_state_with_history()
+        mgr1.put(state)
+        mgr1.undo("expr_test", steps=1)
+
+        mgr2 = ExpressionStateManager(checkpoint_dir=tmp_path)
+        restored = mgr2.get("expr_test")
+        assert restored.history_index == 0
+        assert restored.current_latex == "A"
+
+    def test_backward_compatible_no_checkpoint_dir(self):
+        """ExpressionStateManager() with no args must still work"""
+        mgr = ExpressionStateManager()
+        state = _make_state()
+        mgr.put(state)
+        assert mgr.get("expr_test") is state

@@ -3,52 +3,50 @@
   <div class="attention-analysis">
     <h2>注意力分析</h2>
     <div class="toolbar">
-      <select v-model="selectedCheckpoint" class="checkpoint-select">
-        <option value="">选择检查点</option>
-        <option
-          v-for="cp in checkpoints"
-          :key="cp.id"
-          :value="cp.id"
-        >
-          {{ cp.id }} (loss: {{ cp.final_loss.toFixed(4) }})
-        </option>
-      </select>
-      <button
-        @click="analyze"
+      <PlSelect
+        :model-value="selectedCheckpoint"
+        :options="checkpointOptions"
+        label="检查点"
+        @update:model-value="selectedCheckpoint = $event"
+      />
+      <PlButton
+        variant="primary"
         :disabled="!selectedCheckpoint || loading"
-        class="btn-analyze"
+        @click="analyze"
       >
         分析
-      </button>
-      <label v-if="network" class="threshold-control">
-        阈值: {{ threshold }}
-        <input
-          type="range"
-          v-model.number="threshold"
-          min="0"
-          max="100"
-          step="1"
-          @change="updateNetwork"
-        />
-      </label>
+      </PlButton>
+      <PlInput
+        v-if="network"
+        :model-value="String(threshold)"
+        type="number"
+        label="阈值"
+        @update:model-value="handleThresholdChange"
+      />
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+    <PlSpinner v-if="loading" size="md" />
+    <PlToast v-else-if="error" :message="error" variant="error" />
+
+    <PlEmptyState
+      v-else-if="!heatmap && !network"
+      title="尚无分析数据"
+      description="选择一个检查点并点击分析以查看注意力热力图和关联网络图"
+    />
 
     <div v-if="heatmap" class="panels">
-      <div class="panel">
+      <PlCard variant="base" padding="md">
         <h3>注意力热力图</h3>
         <v-chart :option="heatmapOption" autoresize style="height: 500px" />
-      </div>
-      <div class="panel">
+      </PlCard>
+      <PlCard variant="base" padding="md">
         <h3>关联网络图</h3>
         <div ref="networkRef" class="network-container"></div>
         <div class="legend">
           <span class="legend-item synergistic">协同</span>
           <span class="legend-item antagonistic">拮抗</span>
         </div>
-      </div>
+      </PlCard>
     </div>
   </div>
 </template>
@@ -68,6 +66,15 @@ import * as d3 from "d3";
 import type { NetworkGraphResponse, NetworkNode } from "@/types/analysis";
 import { useAnalysis } from "@/composables/useAnalysis";
 import { useTraining } from "@/composables/useTraining";
+import { CHART_COLORS } from "@/utils/chart-palette";
+
+import PlButton from "@/components/PlButton.vue";
+import PlSelect from "@/components/PlSelect.vue";
+import PlInput from "@/components/PlInput.vue";
+import PlCard from "@/components/PlCard.vue";
+import PlSpinner from "@/components/PlSpinner.vue";
+import PlToast from "@/components/PlToast.vue";
+import PlEmptyState from "@/components/PlEmptyState.vue";
 
 use([HeatmapChart, GridComponent, TooltipComponent, VisualMapComponent, CanvasRenderer]);
 
@@ -91,6 +98,13 @@ let simulation: d3.Simulation<SimNode, d3.SimulationLinkDatum<SimNode>> | null =
   null;
 
 fetchCheckpoints();
+
+const checkpointOptions = computed(() =>
+  checkpoints.value.map((cp) => ({
+    value: cp.id,
+    label: `${cp.id} (loss: ${cp.final_loss.toFixed(4)})`,
+  })),
+);
 
 const heatmapOption = computed(() => {
   if (!heatmap.value) return {};
@@ -131,7 +145,7 @@ const heatmapOption = computed(() => {
       left: "center",
       bottom: "0%",
       inRange: {
-        color: ["#313695", "#4575b4", "#74add1", "#abd9e9", "#fee090", "#fdae61", "#f46d43", "#d73027"],
+        color: ["#dcecfa", "#5a8fa8", "#3d8b7a", "#dd5b00", "#7b3ff2", "#5b6abf", "#e03131", "#1a1a1a"],
       },
     },
     series: [
@@ -194,7 +208,7 @@ function renderNetworkGraph(
     .data(links)
     .join("line")
     .attr("stroke", (d) =>
-      d.classification === "synergistic" ? "#4caf50" : "#f44336",
+      d.classification === "synergistic" ? CHART_COLORS.success : CHART_COLORS.error,
     )
     .attr("stroke-width", (d) => Math.max(1, d.weight * 10))
     .attr("stroke-opacity", 0.6);
@@ -226,7 +240,7 @@ function renderNetworkGraph(
   node
     .append("circle")
     .attr("r", 10)
-    .attr("fill", "#2196f3")
+    .attr("fill", CHART_COLORS.primary)
     .attr("stroke", "#fff")
     .attr("stroke-width", 2);
 
@@ -245,6 +259,11 @@ function renderNetworkGraph(
       .attr("y2", (d) => (d.target as SimNode).y!);
     node.attr("transform", (d) => `translate(${d.x},${d.y})`);
   });
+}
+
+function handleThresholdChange(val: string) {
+  threshold.value = Number(val);
+  updateNetwork();
 }
 
 async function analyze() {
@@ -294,38 +313,10 @@ h2 {
 
 .toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
   margin-bottom: 20px;
   justify-content: center;
-}
-
-.checkpoint-select {
-  padding: 6px 12px;
-  border: 1px solid var(--color-muted);
-  border-radius: var(--radius-sm);
-  min-width: 250px;
-}
-
-.btn-analyze {
-  padding: 6px 20px;
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.btn-analyze:disabled {
-  background: var(--color-muted);
-  cursor: not-allowed;
-}
-
-.threshold-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
 }
 
 .panels {
@@ -334,13 +325,8 @@ h2 {
   gap: 20px;
 }
 
-.panel {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
-  padding: 16px;
-}
-
-.panel h3 {
+.panel h3,
+.pl-card h3 {
   margin: 0 0 12px 0;
   color: var(--color-charcoal);
   font-size: 16px;
@@ -381,14 +367,9 @@ h2 {
   background: var(--color-error);
 }
 
-.loading,
-.error {
-  text-align: center;
-  padding: 40px;
-  color: var(--color-steel);
-}
-
-.error {
-  color: var(--color-error);
+@media (max-width: 1024px) {
+  .panels {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -2,54 +2,65 @@
   <div class="expression-derivation">
     <h2>表达式推导</h2>
     <div class="toolbar">
-      <select v-model="selectedCheckpoint" class="checkpoint-select">
-        <option value="">选择检查点</option>
-        <option v-for="cp in checkpoints" :key="cp.id" :value="cp.id">
-          {{ cp.id }} (loss: {{ cp.final_loss.toFixed(4) }})
-        </option>
-      </select>
-      <select v-model="selectedPreset" class="preset-select">
-        <option value="quick">快速 (~1 min)</option>
-        <option value="standard">标准 (~2-5 min)</option>
-        <option value="thorough">深度 (~5-15 min)</option>
-      </select>
-      <button @click="generate" :disabled="!selectedCheckpoint || loading" class="btn-generate">
+      <PlSelect
+        :model-value="selectedCheckpoint"
+        :options="checkpointOptions"
+        label="检查点"
+        @update:model-value="selectedCheckpoint = $event"
+      />
+      <PlSelect
+        :model-value="selectedPreset"
+        :options="presetOptions"
+        label="预设"
+        @update:model-value="selectedPreset = $event"
+      />
+      <PlButton
+        variant="primary"
+        :disabled="!selectedCheckpoint || loading"
+        @click="generate"
+      >
         生成表达式
-      </button>
+      </PlButton>
       <template v-if="expression">
-        <button @click="simplify" :disabled="loading" class="btn-action">精简</button>
-        <button @click="optimize" :disabled="loading" class="btn-action">
+        <PlButton variant="secondary" :disabled="loading" @click="simplify">精简</PlButton>
+        <PlButton variant="secondary" :disabled="loading" @click="optimize">
           优化<template v-if="expression?.pareto_count"> ({{ expression.pareto_index + 1 }}/{{ expression.pareto_count }})</template>
-        </button>
-        <button @click="undo" :disabled="loading || !canUndo" class="btn-action">撤销</button>
-        <button @click="redo" :disabled="loading || !canRedo" class="btn-action">重做</button>
+        </PlButton>
+        <PlButton variant="ghost" :disabled="loading || !canUndo" @click="undo">撤销</PlButton>
+        <PlButton variant="ghost" :disabled="loading || !canRedo" @click="redo">重做</PlButton>
       </template>
     </div>
-    <div v-if="loading" class="loading">{{ loadingMessage }}</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+    <div v-if="loading" class="status-area">
+      <PlSpinner size="sm" />
+      <span class="loading-text">{{ loadingMessage }}</span>
+    </div>
+    <PlToast v-if="error" :message="error" variant="error" />
     <template v-if="expression">
       <div class="indicators-grid" v-if="expression?.indicators && Object.keys(expression.indicators).length > 0">
-        <div class="indicator" v-for="(value, key) in expression.indicators" :key="key">
-          <span class="indicator-label">{{ formatIndicatorLabel(key as string) }}</span>
-          <span class="indicator-value">{{ formatIndicatorValue(key as string, value) }}</span>
-        </div>
+        <PlStatCard
+          v-for="(value, key) in expression.indicators"
+          :key="key"
+          :label="formatIndicatorLabel(key as string)"
+          :value="formatIndicatorValue(key as string, value)"
+          :variant="indicatorVariant(key as string)"
+        />
       </div>
       <div class="panels">
-        <div class="panel latex-panel">
+        <PlCard variant="base" padding="md" class="panel latex-panel">
           <h3>符号表达式</h3>
           <div ref="katexRef" class="katex-container"></div>
-        </div>
-        <div class="panel tree-panel">
+        </PlCard>
+        <PlCard variant="base" padding="md" class="panel tree-panel">
           <h3>表达式树</h3>
           <div class="tree-container">
             <TreeNode :node="expression.tree" :depth="0" :variable-impact="expression.variable_impact" />
           </div>
-        </div>
+        </PlCard>
       </div>
-      <div v-if="impactChartOption" class="panel impact-panel">
+      <PlCard v-if="impactChartOption" variant="base" padding="md" class="impact-panel">
         <h3>成分影响力</h3>
         <VChart :option="impactChartOption" class="impact-chart" autoresize />
-      </div>
+      </PlCard>
     </template>
   </div>
 </template>
@@ -70,6 +81,13 @@ import {
   TooltipComponent,
 } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
+import PlButton from "@/components/PlButton.vue";
+import PlSelect from "@/components/PlSelect.vue";
+import PlCard from "@/components/PlCard.vue";
+import PlStatCard from "@/components/PlStatCard.vue";
+import PlSpinner from "@/components/PlSpinner.vue";
+import PlToast from "@/components/PlToast.vue";
+import { CHART_PALETTE } from "@/utils/chart-palette";
 
 use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
@@ -87,6 +105,20 @@ const {
 } = useExpression();
 const { getDataset } = useDatasets();
 const targetName = ref("");
+
+const checkpointOptions = computed(() => [
+  { value: "", label: "选择检查点" },
+  ...checkpoints.value.map((cp) => ({
+    value: cp.id,
+    label: `${cp.id} (loss: ${cp.final_loss.toFixed(4)})`,
+  })),
+]);
+
+const presetOptions = [
+  { value: "quick", label: "快速 (~1 min)" },
+  { value: "standard", label: "标准 (~2-5 min)" },
+  { value: "thorough", label: "深度 (~5-15 min)" },
+];
 
 const INDICATOR_LABELS: Record<string, string> = {
   train_r2: "R² (训练)",
@@ -110,6 +142,12 @@ function formatIndicatorLabel(key: string): string {
 function formatIndicatorValue(key: string, value: number): string {
   if (key === "depth" || key === "length") return value.toFixed(0);
   return value.toFixed(4);
+}
+
+function indicatorVariant(key: string): "mint" | "lavender" | "sky" {
+  if (key.startsWith("train_")) return "mint";
+  if (key.startsWith("test_")) return "lavender";
+  return "sky";
 }
 
 const canUndo = computed(() => history.value ? history.value.current_index > 0 : false);
@@ -136,7 +174,7 @@ const impactChartOption = computed(() => {
     series: [{
       type: "bar",
       data: sorted.map(([, value]) => value.toFixed(2)),
-      itemStyle: { color: "#4caf50" },
+      itemStyle: { color: CHART_PALETTE[0] },
       barMaxWidth: 24,
       label: {
         show: true,
@@ -231,32 +269,19 @@ h2 { color: var(--color-ink); }
 .toolbar {
   display: flex;
   gap: 8px;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
-.checkpoint-select {
-  padding: 6px 12px;
-  border: 1px solid var(--color-muted);
-  border-radius: var(--radius-sm);
+.status-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
-.preset-select {
-  padding: 6px 12px;
-  border: 1px solid var(--color-muted);
-  border-radius: var(--radius-sm);
-}
-.btn-generate, .btn-action {
-  padding: 6px 16px;
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.btn-generate { background: var(--color-primary); }
-.btn-action { background: var(--color-link-blue); }
-.btn-generate:disabled, .btn-action:disabled {
-  background: var(--color-muted);
-  cursor: not-allowed;
+.loading-text {
+  color: var(--color-slate);
+  font-size: var(--font-size-body);
 }
 .indicators-grid {
   display: grid;
@@ -264,33 +289,11 @@ h2 { color: var(--color-ink); }
   gap: 8px;
   margin-bottom: 16px;
 }
-.indicator {
-  background: var(--color-tint-mint);
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.indicator-label {
-  color: var(--color-steel);
-  font-size: 11px;
-}
-.indicator-value {
-  font-weight: 600;
-  color: var(--color-ink);
-}
 .panels {
   display: flex;
   gap: 20px;
 }
-.panel {
-  flex: 1;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
-  padding: 16px;
-}
+.panel { flex: 1; }
 .panel h3 { margin-top: 0; color: var(--color-charcoal); }
 .katex-container {
   min-height: 80px;
@@ -305,8 +308,9 @@ h2 { color: var(--color-ink); }
   font-family: monospace;
   font-size: 14px;
 }
-.loading { color: var(--color-steel); }
-.error { color: var(--color-error); }
 .impact-panel { margin-top: 20px; }
 .impact-chart { height: 240px; width: 100%; }
+@media (max-width: 1024px) {
+  .panels { flex-direction: column; }
+}
 </style>

@@ -3,42 +3,54 @@
     <h2>模型评估</h2>
 
     <div class="toolbar">
-      <select v-model="selectedCheckpoint" class="select">
-        <option value="">选择检查点</option>
-        <option v-for="cp in checkpoints" :key="cp.id" :value="cp.id">
-          {{ cp.id }} (loss: {{ cp.final_loss.toFixed(4) }})
-        </option>
-      </select>
-      <button :disabled="!selectedCheckpoint || loading" @click="evaluate">
+      <PlSelect
+        :model-value="selectedCheckpoint"
+        :options="checkpointOptions"
+        label="检查点"
+        @update:model-value="selectedCheckpoint = $event"
+      />
+      <PlButton variant="primary" :disabled="!selectedCheckpoint" :loading="loading" @click="evaluate">
         评估
-      </button>
-      <span v-if="loading">加载中...</span>
-      <span v-if="error" class="error">{{ error }}</span>
+      </PlButton>
+      <PlSpinner v-if="loading" size="sm" />
+      <PlToast v-if="error" :message="error" variant="error" />
     </div>
 
     <div v-if="metrics" class="metrics-bar">
-      <span>R2 = {{ metrics.aggregate.r2_mean.toFixed(4) }} +/- {{ metrics.aggregate.r2_std.toFixed(4) }}</span>
-      <span>MSE = {{ metrics.aggregate.mse_mean.toFixed(4) }} +/- {{ metrics.aggregate.mse_std.toFixed(4) }}</span>
-      <span>MAE = {{ metrics.aggregate.mae_mean.toFixed(4) }} +/- {{ metrics.aggregate.mae_std.toFixed(4) }}</span>
+      <PlStatCard
+        label="R²"
+        :value="`${metrics.aggregate.r2_mean.toFixed(4)} ± ${metrics.aggregate.r2_std.toFixed(4)}`"
+        variant="mint"
+      />
+      <PlStatCard
+        label="MSE"
+        :value="`${metrics.aggregate.mse_mean.toFixed(4)} ± ${metrics.aggregate.mse_std.toFixed(4)}`"
+        variant="lavender"
+      />
+      <PlStatCard
+        label="MAE"
+        :value="`${metrics.aggregate.mae_mean.toFixed(4)} ± ${metrics.aggregate.mae_std.toFixed(4)}`"
+        variant="sky"
+      />
     </div>
 
     <div v-if="metrics" class="charts-grid">
-      <div class="chart-panel">
+      <PlCard variant="base" padding="md">
         <h3>Predicted vs Actual</h3>
         <v-chart :option="scatterOption" autoresize style="height: 300px" />
-      </div>
+      </PlCard>
 
-      <div class="chart-panel">
+      <PlCard variant="base" padding="md">
         <h3>残差分布</h3>
         <v-chart :option="histogramOption" autoresize style="height: 300px" />
-      </div>
+      </PlCard>
 
-      <div class="chart-panel">
+      <PlCard variant="base" padding="md">
         <h3>训练损失曲线</h3>
         <v-chart :option="lossCurveOption" autoresize style="height: 300px" />
-      </div>
+      </PlCard>
 
-      <div class="chart-panel">
+      <PlCard variant="base" padding="md">
         <h3>K-Fold 指标</h3>
         <table class="metrics-table">
           <thead>
@@ -59,14 +71,14 @@
           </tbody>
           <tfoot>
             <tr>
-              <td>Mean +/- Std</td>
-              <td>{{ metrics.aggregate.r2_mean.toFixed(4) }} +/- {{ metrics.aggregate.r2_std.toFixed(4) }}</td>
-              <td>{{ metrics.aggregate.mse_mean.toFixed(4) }} +/- {{ metrics.aggregate.mse_std.toFixed(4) }}</td>
-              <td>{{ metrics.aggregate.mae_mean.toFixed(4) }} +/- {{ metrics.aggregate.mae_std.toFixed(4) }}</td>
+              <td>Mean ± Std</td>
+              <td>{{ metrics.aggregate.r2_mean.toFixed(4) }} ± {{ metrics.aggregate.r2_std.toFixed(4) }}</td>
+              <td>{{ metrics.aggregate.mse_mean.toFixed(4) }} ± {{ metrics.aggregate.mse_std.toFixed(4) }}</td>
+              <td>{{ metrics.aggregate.mae_mean.toFixed(4) }} ± {{ metrics.aggregate.mae_std.toFixed(4) }}</td>
             </tr>
           </tfoot>
         </table>
-      </div>
+      </PlCard>
     </div>
   </div>
 </template>
@@ -74,9 +86,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import VChart from "vue-echarts";
+import { use } from "echarts/core";
+import { ScatterChart, LineChart, BarChart } from "echarts/charts";
+import { GridComponent, TooltipComponent, LegendComponent } from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
 import { useEvaluation } from "@/composables/useEvaluation";
 import { useTraining } from "@/composables/useTraining";
-import "echarts";
+import { CHART_PALETTE, CHART_COLORS } from "@/utils/chart-palette";
+import PlSelect from "@/components/PlSelect.vue";
+import PlButton from "@/components/PlButton.vue";
+import PlCard from "@/components/PlCard.vue";
+import PlStatCard from "@/components/PlStatCard.vue";
+import PlSpinner from "@/components/PlSpinner.vue";
+import PlToast from "@/components/PlToast.vue";
+
+use([ScatterChart, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
 const {
   metrics, predictions, residuals, lossCurve,
@@ -85,6 +109,10 @@ const {
 const { checkpoints, fetchCheckpoints } = useTraining();
 
 const selectedCheckpoint = ref("");
+
+const checkpointOptions = computed(() =>
+  checkpoints.value.map((cp) => ({ value: cp.id, label: `${cp.id} (loss: ${cp.final_loss.toFixed(4)})` }))
+);
 
 onMounted(() => {
   fetchCheckpoints();
@@ -110,7 +138,7 @@ const scatterOption = computed(() => {
         type: "scatter",
         data,
         symbolSize: 6,
-        itemStyle: { color: "#4caf50" },
+        color: CHART_PALETTE[0],
       },
       {
         type: "line",
@@ -118,7 +146,7 @@ const scatterOption = computed(() => {
           [min, min],
           [max, max],
         ],
-        lineStyle: { type: "dashed", color: "#999" },
+        lineStyle: { type: "dashed", color: CHART_COLORS.muted },
         symbol: "none",
       },
     ],
@@ -139,7 +167,7 @@ const histogramOption = computed(() => {
       {
         type: "bar",
         data: bins.map((b) => b.count),
-        itemStyle: { color: "#2196f3" },
+        color: CHART_PALETTE[1],
       },
     ],
   };
@@ -148,12 +176,14 @@ const histogramOption = computed(() => {
 const lossCurveOption = computed(() => {
   if (!lossCurve.value || lossCurve.value.folds.length === 0) return {};
   const series: Array<Record<string, unknown>> = [];
-  for (const fold of lossCurve.value.folds) {
+  for (const [idx, fold] of lossCurve.value.folds.entries()) {
+    const foldColor = CHART_PALETTE[idx % CHART_PALETTE.length];
     series.push({
       name: `Fold ${fold.fold} - Train`,
       type: "line",
       data: fold.points.map((p) => [p.epoch, p.train_loss]),
       smooth: true,
+      color: foldColor,
     });
     series.push({
       name: `Fold ${fold.fold} - Val`,
@@ -161,6 +191,7 @@ const lossCurveOption = computed(() => {
       data: fold.points.map((p) => [p.epoch, p.val_loss]),
       smooth: true,
       lineStyle: { type: "dashed" },
+      color: foldColor,
     });
   }
   return {
@@ -188,35 +219,10 @@ const lossCurveOption = computed(() => {
   margin-bottom: 16px;
 }
 
-.select {
-  padding: 6px 12px;
-  min-width: 300px;
-}
-
-.toolbar button {
-  padding: 6px 16px;
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.toolbar button:disabled {
-  background: var(--color-muted);
-  cursor: not-allowed;
-}
-
-.error { color: var(--color-error); }
-
 .metrics-bar {
   display: flex;
-  gap: 24px;
-  padding: 12px;
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
+  gap: 16px;
   margin-bottom: 16px;
-  font-size: 14px;
 }
 
 .charts-grid {
@@ -225,13 +231,7 @@ const lossCurveOption = computed(() => {
   gap: 16px;
 }
 
-.chart-panel {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-}
-
-.chart-panel h3 {
+.charts-grid h3 {
   margin: 0 0 8px 0;
   font-size: 14px;
   color: var(--color-charcoal);
@@ -257,5 +257,11 @@ const lossCurveOption = computed(() => {
 .metrics-table tfoot td {
   font-weight: bold;
   background: var(--color-surface-soft);
+}
+
+@media (max-width: 1024px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

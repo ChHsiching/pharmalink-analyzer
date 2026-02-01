@@ -2,67 +2,72 @@
   <div class="formulation">
     <h2>最优配比</h2>
 
-    <div v-if="exprId" class="expr-info">
-      当前表达式: <code>{{ exprId }}</code>
+    <div class="toolbar">
+      <PlSelect
+        :model-value="selectedCheckpoint"
+        :options="checkpointOptions"
+        label="检查点"
+        @update:model-value="handleCheckpointChange"
+      />
+      <PlSelect
+        v-if="expressionOptions.length"
+        :model-value="selectedExprId"
+        :options="expressionOptions"
+        label="表达式"
+        @update:model-value="handleExpressionChange"
+      />
+      <PlInput
+        :model-value="topK"
+        type="number"
+        label="Top K"
+        @update:model-value="topK = Number($event)"
+      />
+      <PlInput
+        :model-value="nSamples"
+        type="number"
+        label="采样数"
+        @update:model-value="nSamples = Number($event)"
+      />
+      <PlButton
+        variant="primary"
+        :disabled="!selectedExprId || loading"
+        @click="runFormulation"
+      >
+        开始寻优
+      </PlButton>
+      <PlButton v-if="result" variant="secondary" @click="exportCsv">
+        导出 CSV
+      </PlButton>
     </div>
 
-    <div v-if="!exprId" class="empty-hint">
-      请先在「表达式推导」页面生成表达式
-    </div>
+    <PlEmptyState
+      v-if="!selectedExprId && !expressionOptions.length"
+      title="未生成表达式"
+      description="请先在「表达式推导」页面生成表达式后再进行配比寻优"
+      action="前往表达式推导"
+      @action="goToExpression"
+    />
 
-    <template v-else>
-      <div class="toolbar">
-        <label class="param-label">
-          Top K
-          <input
-            type="number"
-            v-model.number="topK"
-            min="1"
-            max="50"
-            class="input"
-          />
-        </label>
-        <label class="param-label">
-          采样数
-          <input
-            type="number"
-            v-model.number="nSamples"
-            min="100"
-            max="10000"
-            step="100"
-            class="input"
-          />
-        </label>
-        <button
-          :disabled="loading"
-          @click="runFormulation"
-          class="btn-primary"
-        >
-          开始寻优
-        </button>
-        <button v-if="result" @click="exportCsv" class="btn-secondary">
-          导出 CSV
-        </button>
-      </div>
+    <template v-else-if="selectedExprId">
+      <PlSpinner v-if="loading" size="md" />
 
-      <div v-if="loading" class="status">寻优计算中...</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
+      <PlToast v-if="error" :message="error" variant="error" />
 
       <div v-if="result?.attention_weak" class="warning-banner">
         注意力权重过于均匀，结果已通过 softmax 增强。建议增加训练层数或训练轮次以获得更显著的注意力分布。
       </div>
 
       <template v-if="result">
-        <div class="section">
+        <PlCard variant="base" padding="md">
           <h3>注意力权重</h3>
           <v-chart
             :option="attentionOption"
             autoresize
             style="height: 260px"
           />
-        </div>
+        </PlCard>
 
-        <div class="section">
+        <PlCard variant="base" padding="md">
           <h3>候选配比</h3>
           <table class="result-table">
             <thead>
@@ -86,39 +91,110 @@
               </tr>
             </tbody>
           </table>
-        </div>
+        </PlCard>
 
-        <div class="section">
+        <PlCard variant="base" padding="md">
           <h3>候选配比对比</h3>
           <v-chart
             :option="radarOption"
             autoresize
             style="height: 360px"
           />
-        </div>
+        </PlCard>
       </template>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import VChart from "vue-echarts";
-import "echarts";
+import { use } from "echarts/core";
+import { BarChart, RadarChart } from "echarts/charts";
+import {
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+
+import PlButton from "@/components/PlButton.vue";
+import PlInput from "@/components/PlInput.vue";
+import PlSelect from "@/components/PlSelect.vue";
+import PlCard from "@/components/PlCard.vue";
+import PlEmptyState from "@/components/PlEmptyState.vue";
+import PlSpinner from "@/components/PlSpinner.vue";
+import PlToast from "@/components/PlToast.vue";
+
+import { CHART_PALETTE } from "@/utils/chart-palette";
 import { useWorkflow } from "@/composables/useWorkflow";
 import { useFormulation } from "@/composables/useFormulation";
+import { useTraining } from "@/composables/useTraining";
+import { apiClient } from "@/composables/useApi";
 
-const { state } = useWorkflow();
+use([
+  BarChart,
+  RadarChart,
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+  CanvasRenderer,
+]);
+
+const router = useRouter();
+const { state, markCurrentExpression } = useWorkflow();
 const { result, loading, error, formulate, exportCsv } = useFormulation();
+const { checkpoints, fetchCheckpoints } = useTraining();
 
-const exprId = computed(() => state.currentExprId);
+const selectedCheckpoint = ref("");
+const selectedExprId = ref(state.currentExprId);
+const expressionList = ref<{ expr_id: string; latex: string }[]>([]);
 
 const topK = ref(5);
 const nSamples = ref(1000);
 
+const checkpointOptions = computed(() =>
+  checkpoints.value.map((cp) => ({
+    value: cp.id,
+    label: `${cp.id} (loss: ${cp.final_loss.toFixed(4)})`,
+  })),
+);
+
+const expressionOptions = computed(() =>
+  expressionList.value.map((e) => ({ value: e.expr_id, label: e.expr_id })),
+);
+
+async function handleCheckpointChange(cpId: string) {
+  selectedCheckpoint.value = cpId;
+  selectedExprId.value = "";
+  expressionList.value = [];
+  try {
+    const { data } = await apiClient.get<
+      { expr_id: string; latex: string }[]
+    >(`/expressions?checkpoint_id=${cpId}`);
+    expressionList.value = data;
+    if (data.length === 1) {
+      selectedExprId.value = data[0].expr_id;
+      markCurrentExpression(data[0].expr_id);
+    }
+  } catch {
+    /* no expressions */
+  }
+}
+
+function handleExpressionChange(exprId: string) {
+  selectedExprId.value = exprId;
+  markCurrentExpression(exprId);
+}
+
+function goToExpression() {
+  router.push("/expression");
+}
+
 async function runFormulation() {
-  if (!exprId.value) return;
-  await formulate(exprId.value, topK.value, nSamples.value);
+  if (!selectedExprId.value) return;
+  await formulate(selectedExprId.value, topK.value, nSamples.value);
 }
 
 const attentionOption = computed(() => {
@@ -138,7 +214,7 @@ const attentionOption = computed(() => {
       {
         type: "bar",
         data: entries.map((e) => e[1]),
-        itemStyle: { color: "#4caf50" },
+        itemStyle: { color: CHART_PALETTE[0] },
       },
     ],
   };
@@ -159,13 +235,12 @@ const radarOption = computed(() => {
     max: maxValues[f] > 0 ? maxValues[f] * 1.1 : 1,
   }));
 
-  const colors = ["#4caf50", "#2196f3", "#ff9800"];
   const series = top.map((c, i) => ({
     value: feature_names.map((f) => c.components[f]),
     name: `#${c.rank}`,
     areaStyle: { opacity: 0.15 },
-    lineStyle: { color: colors[i] },
-    itemStyle: { color: colors[i] },
+    lineStyle: { color: CHART_PALETTE[i] },
+    itemStyle: { color: CHART_PALETTE[i] },
   }));
 
   return {
@@ -174,6 +249,18 @@ const radarOption = computed(() => {
     radar: { indicator },
     series: [{ type: "radar", data: series }],
   };
+});
+
+onMounted(async () => {
+  await fetchCheckpoints();
+  if (state.currentExprId && !selectedCheckpoint.value) {
+    const cp = checkpoints.value[0];
+    if (cp) {
+      selectedCheckpoint.value = cp.id;
+      await handleCheckpointChange(cp.id);
+      selectedExprId.value = state.currentExprId;
+    }
+  }
 });
 </script>
 
@@ -189,81 +276,18 @@ h2 {
   color: var(--color-ink);
 }
 
-.expr-info {
-  padding: 8px 12px;
-  background: var(--color-tint-sky);
-  border-radius: var(--radius-sm);
-  margin-bottom: 12px;
-  font-size: 14px;
-  color: var(--color-link-blue);
-}
-.expr-info code {
-  background: var(--color-tint-sky);
-  padding: 2px 6px;
-  border-radius: var(--radius-xs);
-  font-family: monospace;
-}
-
 h3 {
   margin: 0 0 8px 0;
   font-size: 14px;
   color: var(--color-charcoal);
 }
 
-.empty-hint {
-  padding: 40px;
-  text-align: center;
-  color: var(--color-steel);
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
-}
-
 .toolbar {
   display: flex;
   gap: 12px;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: 16px;
   flex-wrap: wrap;
-}
-
-.param-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-}
-
-.input {
-  width: 90px;
-  padding: 6px 8px;
-  border: 1px solid var(--color-muted);
-  border-radius: var(--radius-sm);
-}
-
-.btn-primary,
-.btn-secondary {
-  padding: 6px 16px;
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-}
-
-.btn-secondary {
-  background: var(--color-link-blue);
-}
-
-.btn-primary:disabled {
-  background: var(--color-muted);
-  cursor: not-allowed;
-}
-
-.status {
-  color: var(--color-steel);
 }
 
 .warning-banner {
@@ -274,17 +298,6 @@ h3 {
   margin-bottom: 16px;
   font-size: 13px;
   color: var(--color-charcoal);
-}
-
-.error {
-  color: var(--color-error);
-}
-
-.section {
-  margin-bottom: 20px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  padding: 12px;
 }
 
 .result-table {

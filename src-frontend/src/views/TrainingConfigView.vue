@@ -3,121 +3,165 @@
     <section class="config-panel">
       <h2>训练配置</h2>
 
-      <div class="form-group">
-        <label>数据集</label>
-        <select v-model="config.dataset_id">
-          <option value="">-- 选择数据集 --</option>
-          <option v-for="ds in datasets" :key="ds.id" :value="ds.id">
-            {{ ds.name }} ({{ ds.target }})
-          </option>
-        </select>
+      <PlSelect
+        :model-value="config.dataset_id"
+        :options="datasetOptions"
+        label="数据集"
+        @update:model-value="config.dataset_id = $event"
+      />
+
+      <div class="form-row">
+        <PlInput
+          :model-value="String(config.d_model)"
+          type="number"
+          label="d_model"
+          @update:model-value="config.d_model = Number($event)"
+        />
+        <PlInput
+          :model-value="String(config.n_heads)"
+          type="number"
+          label="Heads"
+          @update:model-value="config.n_heads = Number($event)"
+        />
+        <PlInput
+          :model-value="String(config.n_layers)"
+          type="number"
+          label="Layers"
+          @update:model-value="config.n_layers = Number($event)"
+        />
       </div>
 
       <div class="form-row">
-        <div class="form-group">
-          <label>d_model</label>
-          <input v-model.number="config.d_model" type="number" min="8" max="256" />
-        </div>
-        <div class="form-group">
-          <label>Heads</label>
-          <input v-model.number="config.n_heads" type="number" min="1" max="16" />
-        </div>
-        <div class="form-group">
-          <label>Layers</label>
-          <input v-model.number="config.n_layers" type="number" min="1" max="8" />
-        </div>
+        <PlInput
+          :model-value="String(config.learning_rate)"
+          type="number"
+          label="Learning Rate"
+          @update:model-value="config.learning_rate = Number($event)"
+        />
+        <PlInput
+          :model-value="String(config.epochs)"
+          type="number"
+          label="Epochs"
+          @update:model-value="config.epochs = Number($event)"
+        />
+        <PlInput
+          :model-value="String(config.k_folds)"
+          type="number"
+          label="K-Fold"
+          @update:model-value="config.k_folds = Number($event)"
+        />
       </div>
 
       <div class="form-row">
-        <div class="form-group">
-          <label>Learning Rate</label>
-          <input v-model.number="config.learning_rate" type="number" step="0.0001" />
-        </div>
-        <div class="form-group">
-          <label>Epochs</label>
-          <input v-model.number="config.epochs" type="number" min="1" max="1000" />
-        </div>
-        <div class="form-group">
-          <label>K-Fold</label>
-          <input v-model.number="config.k_folds" type="number" min="2" max="10" />
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label>Dropout</label>
-          <input v-model.number="config.dropout" type="number" step="0.05" min="0" max="0.5" />
-        </div>
-        <div class="form-group">
-          <label>Weight Decay</label>
-          <input v-model.number="config.weight_decay" type="number" step="0.0001" />
-        </div>
-        <div class="form-group">
-          <label>Early Stop</label>
-          <input v-model.number="config.early_stopping_patience" type="number" min="1" max="100" />
-        </div>
+        <PlInput
+          :model-value="String(config.dropout)"
+          type="number"
+          label="Dropout"
+          @update:model-value="config.dropout = Number($event)"
+        />
+        <PlInput
+          :model-value="String(config.weight_decay)"
+          type="number"
+          label="Weight Decay"
+          @update:model-value="config.weight_decay = Number($event)"
+        />
+        <PlInput
+          :model-value="String(config.early_stopping_patience)"
+          type="number"
+          label="Early Stop"
+          @update:model-value="config.early_stopping_patience = Number($event)"
+        />
       </div>
 
       <div class="section-title">数据增强</div>
       <div class="form-row">
         <div class="form-group">
-          <label>
-            <input v-model="config.augmentation.enabled" type="checkbox" /> 启用
-          </label>
+          <label class="toggle-label">启用</label>
+          <PlButton
+            :variant="config.augmentation.enabled ? 'primary' : 'secondary'"
+            @click="config.augmentation.enabled = !config.augmentation.enabled"
+          >
+            {{ config.augmentation.enabled ? '已启用' : '未启用' }}
+          </PlButton>
         </div>
+        <PlInput
+          v-if="config.augmentation.enabled"
+          :model-value="String(config.augmentation.gaussian_noise_sigma)"
+          type="number"
+          label="噪声 sigma"
+          @update:model-value="config.augmentation.gaussian_noise_sigma = Number($event)"
+        />
         <div class="form-group" v-if="config.augmentation.enabled">
-          <label>噪声 sigma</label>
-          <input v-model.number="config.augmentation.gaussian_noise_sigma" type="number" step="0.01" />
-        </div>
-        <div class="form-group" v-if="config.augmentation.enabled">
-          <label>
-            <input v-model="config.augmentation.bootstrap_enabled" type="checkbox" /> Bootstrap
-          </label>
+          <label class="toggle-label">Bootstrap</label>
+          <PlButton
+            :variant="config.augmentation.bootstrap_enabled ? 'primary' : 'secondary'"
+            @click="config.augmentation.bootstrap_enabled = !config.augmentation.bootstrap_enabled"
+          >
+            {{ config.augmentation.bootstrap_enabled ? '已启用' : '未启用' }}
+          </PlButton>
         </div>
       </div>
 
       <div class="actions">
-        <button class="btn start" @click="handleStart" :disabled="!config.dataset_id || isRunning">
+        <PlButton
+          variant="primary"
+          :disabled="!config.dataset_id || isRunning"
+          @click="handleStart"
+        >
           开始训练
-        </button>
-        <button class="btn stop" @click="handleStop" :disabled="!isRunning">
+        </PlButton>
+        <PlButton
+          variant="ghost"
+          :disabled="!isRunning"
+          @click="handleStop"
+        >
           停止训练
-        </button>
+        </PlButton>
       </div>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <PlToast v-if="error" :message="error" variant="error" />
     </section>
 
     <section class="progress-panel">
       <h2>训练进度</h2>
 
       <div v-if="statusData" class="status-bar">
-        <span class="status-badge" :class="statusData.status">
-          {{ statusText }}
-        </span>
+        <PlBadge :text="statusText" :variant="statusVariant" />
         <span v-if="isRunning">
           Fold {{ statusData.current_fold }}/{{ config.k_folds }} -
           Epoch {{ statusData.current_epoch }}
         </span>
       </div>
 
+      <div v-if="isRunning && latestMetrics" class="stat-row">
+        <PlStatCard label="Train Loss" :value="latestMetrics.trainLoss" variant="mint" />
+        <PlStatCard label="Val Loss" :value="latestMetrics.valLoss" variant="lavender" />
+        <PlStatCard label="Epoch" :value="latestMetrics.epoch" variant="sky" />
+      </div>
+
+      <div v-if="isRunning" class="progress-bar-row">
+        <PlProgressBar :value="statusData?.current_epoch || 0" :max="config.epochs" label="Epoch 进度" />
+      </div>
+
       <div v-if="progress.length" class="chart-container">
         <v-chart class="chart" :option="chartOption" autoresize />
       </div>
 
-      <div v-else class="empty">等待训练开始...</div>
+      <PlEmptyState v-else title="等待训练开始" description="配置训练参数并点击「开始训练」" />
 
       <div v-if="checkpoints.length" class="checkpoints">
         <h3>已保存检查点</h3>
-        <ul>
-          <li v-for="cp in checkpoints" :key="cp.id">
-            <span>{{ cp.dataset_id }}</span>
-            <span class="loss">Loss: {{ cp.final_loss.toFixed(4) }}</span>
-            <button class="btn small" @click="handleLoadCheckpoint(cp.id)">
-              加载
-            </button>
-          </li>
-        </ul>
+        <div class="checkpoint-list">
+          <PlCard v-for="cp in checkpoints" :key="cp.id" variant="base" padding="sm">
+            <div class="checkpoint-item">
+              <span>{{ cp.dataset_id }}</span>
+              <span class="loss">Loss: {{ cp.final_loss.toFixed(4) }}</span>
+              <PlButton variant="primary" @click="handleLoadCheckpoint(cp.id)">
+                加载
+              </PlButton>
+            </div>
+          </PlCard>
+        </div>
       </div>
     </section>
   </div>
@@ -140,6 +184,17 @@ import { useTraining } from "@/composables/useTraining";
 import type { DatasetMeta } from "@/types/dataset";
 import type { TrainingConfig } from "@/types/training";
 import { useWorkflow } from "@/composables/useWorkflow";
+import { CHART_PALETTE } from "@/utils/chart-palette";
+
+import PlButton from "@/components/PlButton.vue";
+import PlInput from "@/components/PlInput.vue";
+import PlSelect from "@/components/PlSelect.vue";
+import PlCard from "@/components/PlCard.vue";
+import PlStatCard from "@/components/PlStatCard.vue";
+import PlBadge from "@/components/PlBadge.vue";
+import PlProgressBar from "@/components/PlProgressBar.vue";
+import PlEmptyState from "@/components/PlEmptyState.vue";
+import PlToast from "@/components/PlToast.vue";
 
 use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -180,6 +235,7 @@ const config = ref<TrainingConfig>({
 });
 
 const isRunning = computed(() => statusData.value?.status === "running");
+
 const statusText = computed(() => {
   const s = statusData.value?.status;
   const map: Record<string, string> = {
@@ -192,10 +248,37 @@ const statusText = computed(() => {
   return map[s || "idle"] || s;
 });
 
+const statusVariant = computed(() => {
+  const map: Record<string, "teal" | "orange" | "pink"> = {
+    idle: "teal",
+    running: "orange",
+    completed: "teal",
+    stopped: "pink",
+    error: "pink",
+  };
+  return map[statusData.value?.status || "idle"] || "teal";
+});
+
+const datasetOptions = computed(() => [
+  { value: "", label: "-- 选择数据集 --" },
+  ...datasets.value.map((ds) => ({ value: ds.id, label: `${ds.name} (${ds.target})` })),
+]);
+
+const latestMetrics = computed(() => {
+  if (progress.value.length === 0) return null;
+  const last = progress.value[progress.value.length - 1];
+  return {
+    trainLoss: last.train_loss.toFixed(4),
+    valLoss: last.val_loss.toFixed(4),
+    epoch: last.epoch,
+  };
+});
+
 const chartOption = computed(() => {
   const trainData = progress.value.map((p) => [p.epoch, p.train_loss]);
   const valData = progress.value.map((p) => [p.epoch, p.val_loss]);
   return {
+    color: [CHART_PALETTE[0], CHART_PALETTE[1]],
     tooltip: { trigger: "axis" },
     legend: { data: ["Train Loss", "Val Loss"] },
     grid: { left: 60, right: 20, top: 40, bottom: 30 },
@@ -248,7 +331,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: minmax(280px, 360px) 1fr;
   height: calc(100vh - 48px);
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-family);
 }
 
 @media (max-width: 768px) {
@@ -267,102 +350,61 @@ onUnmounted(() => {
   padding: 16px;
   overflow-y: auto;
   background: var(--color-surface-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .config-panel h2 {
-  margin: 0 0 16px;
-  font-size: 16px;
+  margin: 0 0 8px;
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-heading);
   color: var(--color-ink);
 }
 
 .section-title {
-  font-weight: 500;
-  margin: 12px 0 8px;
+  font-weight: var(--font-weight-medium);
+  margin: 8px 0 4px;
   color: var(--color-charcoal);
+  font-size: var(--font-size-body);
 }
 
 .form-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
 }
 
 .form-group {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
-.form-group label {
-  font-size: 12px;
-  color: var(--color-steel);
-}
-
-.form-group input[type="number"],
-.form-group select {
-  padding: 4px 8px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
+.toggle-label {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-charcoal);
 }
 
 .actions {
   display: flex;
   gap: 8px;
-  margin-top: 16px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.btn.start {
-  background: var(--color-primary);
-  color: white;
-  flex: 1;
-}
-
-.btn.start:disabled {
-  background: var(--color-tint-mint);
-  cursor: not-allowed;
-}
-
-.btn.stop {
-  background: var(--color-error);
-  color: white;
-}
-
-.btn.stop:disabled {
-  background: var(--color-tint-rose);
-  cursor: not-allowed;
-}
-
-.btn.small {
-  padding: 2px 8px;
-  font-size: 12px;
-  background: var(--color-primary);
-  color: white;
-}
-
-.error {
-  color: var(--color-error);
-  font-size: 13px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .progress-panel {
   padding: 16px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .progress-panel h2 {
-  margin: 0 0 12px;
-  font-size: 16px;
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-heading);
   color: var(--color-success);
 }
 
@@ -370,24 +412,20 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
-.status-badge {
-  padding: 2px 10px;
-  border-radius: var(--radius-lg);
-  font-weight: 500;
+.stat-row {
+  display: flex;
+  gap: 12px;
 }
 
-.status-badge.idle { background: var(--color-hairline); }
-.status-badge.running { background: var(--color-tint-peach); color: var(--color-warning); }
-.status-badge.completed { background: var(--color-tint-mint); color: var(--color-success); }
-.status-badge.stopped { background: var(--color-tint-rose); color: var(--color-error); }
-.status-badge.error { background: var(--color-tint-rose); color: var(--color-error); }
+.progress-bar-row {
+  margin: 4px 0;
+}
 
 .chart-container {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .chart {
@@ -395,33 +433,28 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.empty {
-  color: var(--color-stone);
-  text-align: center;
-  padding: 40px;
-}
-
 .checkpoints h3 {
-  font-size: 14px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
   color: var(--color-ink);
-  margin: 12px 0 8px;
+  margin: 8px 0;
 }
 
-.checkpoints ul {
-  list-style: none;
-  padding: 0;
+.checkpoint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.checkpoints li {
+.checkpoint-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--color-hairline-soft);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
-.checkpoints .loss {
-  color: var(--color-steel);
+.checkpoint-item .loss {
+  color: var(--color-slate);
+  flex: 1;
 }
 </style>

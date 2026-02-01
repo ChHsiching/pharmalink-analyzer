@@ -1,7 +1,9 @@
-import { reactive, computed } from "vue";
+import { reactive, computed, watch } from "vue";
 import { apiClient } from "./useApi";
 import type { DatasetMeta } from "@/types/dataset";
 import type { CheckpointInfo } from "@/types/training";
+
+const STORAGE_KEY = "pharmalink-currentExprId";
 
 export type TabName =
   | "data-import"
@@ -33,8 +35,19 @@ const state = reactive({
   datasetsAvailable: false,
   targetSelected: false,
   hasCheckpoint: false,
-  currentExprId: "",
+  currentExprId: localStorage.getItem(STORAGE_KEY) ?? "",
 });
+
+watch(
+  () => state.currentExprId,
+  (id) => {
+    if (id) {
+      localStorage.setItem(STORAGE_KEY, id);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }
+);
 
 export function useWorkflow() {
   const tabEnabled = computed<Record<TabName, boolean>>(() => ({
@@ -78,6 +91,16 @@ export function useWorkflow() {
       results[1].value.data.length > 0
     ) {
       state.hasCheckpoint = true;
+    }
+    await validateStoredExprId();
+  }
+
+  async function validateStoredExprId() {
+    if (!state.currentExprId) return;
+    try {
+      await apiClient.get(`/expressions/${state.currentExprId}`);
+    } catch {
+      state.currentExprId = "";
     }
   }
 

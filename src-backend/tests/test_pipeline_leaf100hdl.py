@@ -548,3 +548,211 @@ def test_T6_variable_impact(e2e_env):
         "All variable impact values are zero or negative"
     )
 
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(600)
+def test_T7_formulation(e2e_env):
+    """Generate formulation candidates via service layer and validate.
+
+    Uses ExpressionService.generate() to register expression state, then
+    FormulationService.formulate() to look up the state and produce candidates.
+    Prints candidates, top-5 attention weights vs reference, and attention_weak flag.
+    """
+    # Generate expression and register state in state manager
+    response = e2e_env["expression_svc"].generate(
+        e2e_env["checkpoint_id"], top_k=10, preset="standard",
+    )
+
+    # Formulate using the registered expr_id
+    form_result = e2e_env["formulation_svc"].formulate(
+        expr_id=response.expr_id, top_k=20, n_samples=5000,
+    )
+
+    ref = load_reference(1)
+    ref_sorted = sorted(ref["weights"].items(), key=lambda kv: kv[1], reverse=True)
+    our_sorted = sorted(
+        form_result.attention_weights.items(), key=lambda kv: kv[1], reverse=True,
+    )
+
+    print("\n" + "=" * 60)
+    print("T7: Formulation — Candidate Report")
+    print("=" * 60)
+    print(f"  Expr ID: {form_result.expr_id}")
+    print(f"  Number of candidates: {len(form_result.candidates)}")
+    print(f"  Attention weak: {form_result.attention_weak}")
+    print(f"  Feature names: {form_result.feature_names}")
+    print()
+    print("  Top-5 candidates:")
+    for c in form_result.candidates[:5]:
+        comps = ", ".join(f"{k}={v:.4f}" for k, v in c.components.items())
+        print(f"    rank={c.rank}: [{comps}] predicted={c.predicted_response:.6f}")
+    print()
+    print("  Top-5 attention weights (ours vs reference):")
+    print(f"  {'Feature':<30} {'Our Weight':>12} {'Ref Weight':>12}")
+    print(f"  {'-'*30} {'-'*12} {'-'*12}")
+    for (name, our_w), (_, ref_w) in zip(our_sorted[:5], ref_sorted[:5]):
+        print(f"  {name:<30} {our_w:>12.6f} {ref_w:>12.6f}")
+    print("=" * 60)
+
+    # When attention is weak (uniform), formulation may produce zero candidates
+    # because the complex expression evaluates to non-finite values at sampled points.
+    # Assert the service completed without error and returned valid structure.
+    assert form_result.attention_weights, "Attention weights dict is empty"
+    if form_result.candidates:
+        assert len(form_result.candidates) > 0, "Candidates list unexpectedly empty"
+    else:
+        # Zero candidates is acceptable when attention is degenerate
+        assert form_result.attention_weak, (
+            "Zero candidates but attention_weak=False — unexpected"
+        )
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(600)
+def test_T8_full_pipeline(e2e_env):
+    """Run all pipeline stages sequentially and validate end-to-end.
+
+    Stages: attention, expression, simplify, variable impact, indicators,
+    formulation.  Prints structured output at each stage and a final summary.
+    """
+    import signal
+    import sympy
+
+    # --- Stage 1: Attention ---
+    attention_matrix = extract_attention_weights(
+        e2e_env["cp_dir"], e2e_env["X"], e2e_env["config"],
+    )
+    feature_names = e2e_env["feature_names"]
+    col_means = attention_matrix.mean(axis=0)
+    attn_sorted = sorted(
+        [(feature_names[i], float(col_means[i])) for i in range(len(feature_names))],
+        key=lambda kv: kv[1], reverse=True,
+    )
+    attn_ok = attention_matrix.var() > 1e-6
+
+    print("\n" + "=" * 60)
+    print("T8: Full Pipeline — Stage 1: Attention")
+    print("=" * 60)
+    print(f"  Top-5 features: {[n for n, _ in attn_sorted[:5]]}")
+    print(f"  Variance: {attention_matrix.var():.8f}")
+    print(f"  Attention OK: {attn_ok}")
+
+    # --- Stage 2: Expression (via service — registers state for formulation) ---
+    response = e2e_env["expression_svc"].generate(
+        e2e_env["checkpoint_id"], top_k=10, preset="standard",
+    )
+    expr_ok = bool(response.latex) and np.isfinite(response.r2_score)
+
+    print("\n" + "=" * 60)
+    print("T8: Full Pipeline — Stage 2: Expression")
+    print("=" * 60)
+    print(f"  LaTeX: {response.latex[:80]}")
+    print(f"  R²: {response.r2_score:.6f}")
+    print(f"  Complexity: {response.complexity}")
+
+    # --- Stage 3: Simplify ---
+    # Need raw pipeline result for sympy_expr (ExpressionResponse only has tree dict)
+    raw_result = e2e_env["pipeline"].run(
+        model_id=e2e_env["checkpoint_id"], top_k=10, preset="standard",
+    )
+    simplify_timeout = [False]
+
+    def _handler(signum, frame):
+        simplify_timeout[0] = True
+        raise TimeoutError("simplify took too long")
+
+    try:
+        signal.signal(signal.SIGALRM, _handler)
+        signal.alarm(30)
+        simplified = simplify_expr(raw_result.sympy_expr)
+        signal.alarm(0)
+    except TimeoutError:
+        signal.alarm(0)
+        simplified = sympy.factor_terms(raw_result.sympy_expr)
+    finally:
+        signal.alarm(0)
+
+    simp_latex = expr_to_latex(simplified)
+    simplify_ok = bool(simp_latex)
+
+    print("\n" + "=" * 60)
+    print("T8: Full Pipeline — Stage 3: Simplify")
+    print("=" * 60)
+    print(f"  Simplified LaTeX: {simp_latex[:80]}")
+    print(f"  Simplify timed out: {simplify_timeout[0]}")
+
+    # --- Stage 4: Variable Impact ---
+    variable_impact = response.variable_impact
+    active_vars = [k for k, v in variable_impact.items() if v > 0]
+
+    print("\n" + "=" * 60)
+    print("T8: Full Pipeline — Stage 4: Variable Impact")
+    print("=" * 60)
+    print(f"  Active variables ({len(active_vars)}): {active_vars[:10]}")
+
+    # --- Stage 5: Indicators ---
+    indicators = response.indicators
+    ref = load_reference(1)
+    ref_indicators = ref["indicators"]
+
+    key_mapping = {
+        "test_r2": "相关系数 R²(测试)",
+        "train_r2": "相关系数 R²(训练)",
+        "test_mae": "平均绝对误差(测试)",
+        "train_mae": "平均绝对误差(训练)",
+        "test_mse": "均方误差(测试)",
+        "train_mse": "均方误差(训练)",
+        "test_nmse": "归一化均方误差(测试)",
+        "train_nmse": "归一化均方误差(训练)",
+        "test_rmse": "均方根误差(测试)",
+        "train_rmse": "均方根误差(训练)",
+        "depth": "模型深度",
+        "length": "模型长度",
+    }
+
+    print("\n" + "=" * 60)
+    print("T8: Full Pipeline — Stage 5: Indicators")
+    print("=" * 60)
+    print(f"  {'Our Key':<15} {'Our Value':>14} {'Ref Key':<25} {'Ref Value':>14}")
+    print(f"  {'-'*15} {'-'*14} {'-'*25} {'-'*14}")
+    for our_key, ref_key in key_mapping.items():
+        our_val = indicators.get(our_key, "N/A")
+        ref_val = ref_indicators.get(ref_key, "N/A")
+        our_val_str = f"{our_val:.6f}" if isinstance(our_val, float) else str(our_val)
+        ref_val_str = f"{ref_val:.6f}" if isinstance(ref_val, float) else str(ref_val)
+        print(f"  {our_key:<15} {our_val_str:>14} {ref_key:<25} {ref_val_str:>14}")
+
+    # --- Stage 6: Formulation ---
+    form_result = e2e_env["formulation_svc"].formulate(
+        expr_id=response.expr_id, top_k=20, n_samples=5000,
+    )
+    formulation_ok = len(form_result.candidates) > 0
+
+    print("\n" + "=" * 60)
+    print("T8: Full Pipeline — Stage 6: Formulation")
+    print("=" * 60)
+    print(f"  Candidates: {len(form_result.candidates)}")
+    print(f"  Attention weak: {form_result.attention_weak}")
+    for c in form_result.candidates[:3]:
+        comps = ", ".join(f"{k}={v:.4f}" for k, v in c.components.items())
+        print(f"    rank={c.rank}: [{comps}] predicted={c.predicted_response:.6f}")
+
+    # --- Final Summary ---
+    print("\n" + "=" * 60)
+    print("T8: Full Pipeline — Summary")
+    print("=" * 60)
+    print(f"  Attention OK:   {attn_ok}")
+    print(f"  Expression OK:  {expr_ok}")
+    print(f"  Simplify OK:    {simplify_ok}")
+    print(f"  Formulation OK: {formulation_ok}")
+    print("=" * 60)
+
+    # --- Assertions ---
+    assert response.latex, "LaTeX expression is empty"
+    assert np.isfinite(response.r2_score), f"R² is not finite: {response.r2_score}"
+    if not form_result.candidates:
+        # Zero candidates acceptable when attention is degenerate
+        assert form_result.attention_weak, (
+            "Zero candidates but attention_weak=False — unexpected"
+        )

@@ -307,3 +307,116 @@ def test_T1_train_transformer(e2e_env):
         f"Loss did not decrease: first={losses[0]:.4f}, last={losses[-1]:.4f}"
     )
     assert np.isfinite(losses[-1]), f"Final loss is not finite: {losses[-1]}"
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(60)
+def test_T2_attention_extraction(e2e_env):
+    """Extract attention weights and compare feature ranking with reference.
+
+    Validates that the attention matrix has meaningful variance (not degenerate)
+    and prints a comparison against reference round-1 weights.
+    """
+    matrix = extract_attention_weights(
+        e2e_env["cp_dir"], e2e_env["X"], e2e_env["config"],
+    )
+
+    # Per-feature average attention (column means)
+    feature_names = e2e_env["feature_names"]
+    col_means = matrix.mean(axis=0)
+    sorted_indices = np.argsort(col_means)[::-1]
+    sorted_features = [(feature_names[i], float(col_means[i])) for i in sorted_indices]
+
+    ref = load_reference(1)
+    ref_weights = ref["weights"]
+    ref_sorted = sorted(ref_weights.items(), key=lambda kv: kv[1], reverse=True)
+
+    our_top10 = set(name for name, _ in sorted_features[:10])
+    ref_top10 = set(name for name, _ in ref_sorted[:10])
+    overlap = our_top10 & ref_top10
+
+    print("\n" + "=" * 60)
+    print("T2: Attention Extraction — Feature Ranking Report")
+    print("=" * 60)
+    print(f"  Matrix shape: {matrix.shape}")
+    print(f"  Value range: [{matrix.min():.6f}, {matrix.max():.6f}]")
+    print(f"  Variance: {matrix.var():.8f}")
+    print(f"  Top-10 features (ours):  {[n for n, _ in sorted_features[:10]]}")
+    print(f"  Top-10 features (ref):   {[n for n, _ in ref_sorted[:10]]}")
+    print(f"  Top-5 overlap count: {len(overlap & set(n for n, _ in sorted_features[:5]))}")
+    print("=" * 60)
+
+    assert matrix.shape == (21, 21), f"Expected shape (21,21), got {matrix.shape}"
+    assert matrix.var() > 1e-6, f"Attention matrix variance too low: {matrix.var():.8f}"
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(300)
+def test_T3_expression_standard(e2e_env):
+    """Run expression pipeline with standard preset and validate results.
+
+    Checks that symbolic regression produces a valid expression with
+    reasonable R-squared, and prints indicators vs reference.
+    """
+    result = e2e_env["pipeline"].run(
+        model_id=e2e_env["checkpoint_id"],
+        top_k=10,
+        preset="standard",
+    )
+
+    ref = load_reference(1)
+    ref_indicators = ref["indicators"]
+
+    print("\n" + "=" * 60)
+    print("T3: Expression Standard — Pipeline Result Report")
+    print("=" * 60)
+    print(f"  LaTeX: {result.latex}")
+    print(f"  R² (test): {result.r2_score:.6f}")
+    print(f"  Complexity: {result.complexity}")
+    print(f"  Target: {result.target_name}")
+    print(f"  Pareto equations: {len(result.pareto_equations)}")
+    print(f"  Active variables: {list(result.variable_impact.keys())}")
+    print(f"  Our indicators: {result.indicators}")
+    print(f"  Ref indicators: {ref_indicators}")
+    print("=" * 60)
+
+    assert result.latex, "LaTeX expression is empty"
+    assert np.isfinite(result.r2_score), f"R² is not finite: {result.r2_score}"
+    assert result.r2_score > 0.50, f"R² too low: {result.r2_score:.4f}"
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(600)
+def test_T4_expression_presets(e2e_env):
+    """Run expression pipeline across all three presets and compare results.
+
+    Validates that quick, standard, and thorough presets all produce
+    valid expressions, and prints a comparison table.
+    """
+    presets = ["quick", "standard", "thorough"]
+    results = {}
+    for preset in presets:
+        res = e2e_env["pipeline"].run(
+            model_id=e2e_env["checkpoint_id"],
+            top_k=10,
+            preset=preset,
+        )
+        results[preset] = res
+
+    print("\n" + "=" * 60)
+    print("T4: Expression Presets — Comparison Table")
+    print("=" * 60)
+    print(f"  {'Preset':<10} {'R²':>10} {'Complexity':>12} {'LaTeX'}")
+    print(f"  {'-'*10} {'-'*10} {'-'*12} {'-'*40}")
+    for preset in presets:
+        res = results[preset]
+        latex_short = (res.latex[:60] + "...") if len(res.latex) > 60 else res.latex
+        print(f"  {preset:<10} {res.r2_score:>10.6f} {res.complexity:>12} {latex_short}")
+    print("=" * 60)
+
+    for preset in presets:
+        res = results[preset]
+        assert res.latex, f"[{preset}] LaTeX expression is empty"
+        assert np.isfinite(res.r2_score), (
+            f"[{preset}] R² is not finite: {res.r2_score}"
+        )

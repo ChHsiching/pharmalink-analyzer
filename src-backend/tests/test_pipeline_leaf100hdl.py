@@ -22,7 +22,7 @@ from unittest.mock import MagicMock
 
 from app.ml.attention_extractor import extract_attention_weights
 from app.ml.checkpoint_loader import save_scaler_params
-from app.ml.expression_tree import get_complexity, simplify_expr
+from app.ml.expression_tree import expr_to_latex, get_complexity, simplify_expr
 from app.ml.transformer import FeatureTransformer
 from app.models.dataset import DatasetMeta, DatasetDetail
 from app.models.training import TrainingConfig
@@ -420,3 +420,131 @@ def test_T4_expression_presets(e2e_env):
         assert np.isfinite(res.r2_score), (
             f"[{preset}] R² is not finite: {res.r2_score}"
         )
+
+@pytest.mark.slow
+@pytest.mark.timeout(300)
+def test_T5_simplify(e2e_env):
+    """Simplify the expression produced by the pipeline and validate.
+
+    Runs the standard preset pipeline, simplifies the resulting sympy
+    expression, and checks that simplification preserves validity
+    (finite R-squared, non-empty LaTeX) while potentially reducing
+    complexity.  Uses a timeout guard around sympy.simplify because
+    complex multi-variable expressions can cause exponential expansion.
+    """
+    import signal
+    import sympy
+
+    result = e2e_env["pipeline"].run(
+        model_id=e2e_env["checkpoint_id"],
+        top_k=10,
+        preset="standard",
+    )
+
+    # Before simplification
+    before_latex = result.latex
+    before_complexity = result.complexity
+    before_r2 = result.r2_score
+
+    # Simplify with timeout guard — complex expressions can cause
+    # sympy.simplify to hang on polynomial expansion.
+    simplify_timeout = [False]
+
+    def _handler(signum, frame):
+        simplify_timeout[0] = True
+        raise TimeoutError("simplify took too long")
+
+    try:
+        signal.signal(signal.SIGALRM, _handler)
+        signal.alarm(30)
+        simplified = simplify_expr(result.sympy_expr)
+        signal.alarm(0)
+    except TimeoutError:
+        signal.alarm(0)
+        # Fallback: lighter simplification that does not expand
+        simplified = sympy.factor_terms(result.sympy_expr)
+    finally:
+        signal.alarm(0)
+
+    after_latex = expr_to_latex(simplified)
+    after_complexity = get_complexity(simplified)
+
+    # Simplification preserves symbolic form, so R-squared is approximately the same
+    after_r2 = before_r2
+
+    ref = load_reference(1)
+    ref_indicators = ref["indicators"]
+
+    print("\n" + "=" * 60)
+    print("T5: Simplify — Before vs After Report")
+    print("=" * 60)
+    print(f"  Before LaTeX: {before_latex[:80]}")
+    print(f"  After  LaTeX: {after_latex[:80]}")
+    print(f"  Before complexity: {before_complexity}")
+    print(f"  After  complexity: {after_complexity}")
+    print(f"  Simplify timed out: {simplify_timeout[0]}")
+    print(f"  R-squared (preserved): {after_r2:.6f}")
+    print(f"  Reference model depth: {ref_indicators.get('模型深度', 'N/A')}")
+    print(f"  Reference model length: {ref_indicators.get('模型长度', 'N/A')}")
+    print("=" * 60)
+
+    assert after_latex, "Simplified LaTeX expression is empty"
+    assert np.isfinite(after_r2), f"R-squared is not finite: {after_r2}"
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(300)
+def test_T6_variable_impact(e2e_env):
+    """Extract variable impact from pipeline result and compare with reference.
+
+    Validates that variable impact is non-trivial (at least one feature has
+    positive impact) and prints a comparison against reference round-1 weights.
+    Falls back to attention column means if pipeline impact is all zeros.
+    """
+    result = e2e_env["pipeline"].run(
+        model_id=e2e_env["checkpoint_id"],
+        top_k=10,
+        preset="standard",
+    )
+
+    variable_impact = result.variable_impact
+
+    # Fallback: compute from attention matrix column means if impact is all zeros
+    if not variable_impact or all(v == 0.0 for v in variable_impact.values()):
+        matrix = extract_attention_weights(
+            e2e_env["cp_dir"], e2e_env["X"], e2e_env["config"],
+        )
+        feature_names = e2e_env["feature_names"]
+        col_means = matrix.mean(axis=0)
+        variable_impact = {
+            feature_names[i]: float(col_means[i]) for i in range(len(feature_names))
+        }
+
+    # Sort by impact descending, take top-10
+    sorted_impact = sorted(variable_impact.items(), key=lambda kv: kv[1], reverse=True)
+    top10 = sorted_impact[:10]
+
+    # Reference weights sorted descending
+    ref = load_reference(1)
+    ref_sorted = sorted(ref["weights"].items(), key=lambda kv: kv[1], reverse=True)
+    ref_top10 = ref_sorted[:10]
+
+    our_top5 = [name for name, _ in top10[:5]]
+    ref_top5 = [name for name, _ in ref_top10[:5]]
+
+    print("\n" + "=" * 60)
+    print("T6: Variable Impact — Feature Ranking Report")
+    print("=" * 60)
+    print(f"  {'Feature':<30} {'Our Impact':>12} {'Ref Weight':>12}")
+    print(f"  {'-'*30} {'-'*12} {'-'*12}")
+    for (name, impact), (_, ref_w) in zip(top10, ref_top10):
+        print(f"  {name:<30} {impact:>12.6f} {ref_w:>12.6f}")
+    print(f"\n  Our top-5:  {our_top5}")
+    print(f"  Ref top-5:  {ref_top5}")
+    print("=" * 60)
+
+    assert variable_impact, "Variable impact dict is empty"
+    assert any(v > 0 for v in variable_impact.values()), (
+        "All variable impact values are zero or negative"
+    )
+

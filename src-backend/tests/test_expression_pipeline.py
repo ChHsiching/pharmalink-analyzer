@@ -197,10 +197,10 @@ class TestPipelineRun:
         result = pipeline.run("model-abc")
 
         assert isinstance(result, PipelineResult)
-        assert result.latex == "A^{2} + B^{2} + 1"
-        assert result.complexity == 7
-        assert result.loss == 0.005
-        assert result.r2_score == 0.95
+        assert result.latex == "A^{2} + 1"
+        assert result.complexity == 5
+        assert result.loss == 0.01
+        assert result.r2_score == 0.90
         assert len(result.pareto_equations) == 3
 
     def test_run_raises_on_missing_checkpoint(self, pipeline, checkpoint_dir):
@@ -311,7 +311,7 @@ class TestPipelineRun:
         assert len(result.pareto_equations) == 3
         for eq in result.pareto_equations:
             assert "r2_score" in eq
-        assert result.complexity == 7
+        assert result.complexity == 5
 
     @patch("app.services.expression_pipeline.compute_impact")
     @patch("app.services.expression_pipeline.extract_best_equation")

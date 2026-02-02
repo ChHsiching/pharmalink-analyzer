@@ -26,16 +26,16 @@ defineEmits<{ click: [e: MouseEvent] }>();
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 16px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
   font-family: var(--font-family);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--text-sm);
+  font-weight: var(--text-sm-weight);
   line-height: 1;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s, box-shadow 0.15s;
 }
 .pl-button--primary {
   background: var(--color-primary);
@@ -43,6 +43,7 @@ defineEmits<{ click: [e: MouseEvent] }>();
 }
 .pl-button--primary:hover:not(:disabled) {
   background: var(--color-primary-pressed);
+  box-shadow: var(--shadow-raised);
 }
 .pl-button--secondary {
   background: var(--color-surface);
@@ -51,6 +52,7 @@ defineEmits<{ click: [e: MouseEvent] }>();
 }
 .pl-button--secondary:hover:not(:disabled) {
   background: var(--color-surface-soft);
+  box-shadow: var(--shadow-raised);
 }
 .pl-button--ghost {
   background: transparent;

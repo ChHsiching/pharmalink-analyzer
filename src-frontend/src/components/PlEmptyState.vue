@@ -24,29 +24,30 @@ defineEmits<{ action: [] }>();
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
+  padding: var(--space-16) var(--space-6);
   text-align: center;
 }
 .pl-empty__title {
-  font-size: var(--font-size-heading);
-  font-weight: var(--font-weight-heading);
+  font-size: var(--text-h3);
+  font-weight: var(--text-h3-weight);
   color: var(--color-charcoal);
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
 }
 .pl-empty__desc {
-  font-size: var(--font-size-body);
+  font-size: var(--text-sm);
   color: var(--color-stone);
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
   max-width: 320px;
 }
 .pl-empty__action {
-  padding: 8px 20px;
+  padding: var(--space-2) var(--space-5);
   background: var(--color-primary);
   color: var(--color-on-primary);
   border: none;
   border-radius: var(--radius-md);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
+  font-family: var(--font-family);
+  font-size: var(--text-body);
+  font-weight: var(--text-body-weight);
   cursor: pointer;
 }
 .pl-empty__action:hover {

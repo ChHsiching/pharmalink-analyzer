@@ -1,5 +1,11 @@
+import signal
+
 import sympy
 from sympy import Basic
+
+from app.exceptions import SimplifyTimeoutError
+
+SIMPLIFY_TIMEOUT_SECONDS = 10
 
 
 def sympy_to_tree(expr: Basic) -> dict:
@@ -21,8 +27,19 @@ def sympy_to_tree(expr: Basic) -> dict:
 
 
 def simplify_expr(expr: Basic) -> Basic:
-    """Simplify a SymPy expression using algebraic simplification."""
-    return sympy.simplify(expr)
+    """Simplify a SymPy expression with a 10-second timeout safety net."""
+    def _timeout_handler(signum, frame):
+        raise SimplifyTimeoutError()
+
+    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.alarm(SIMPLIFY_TIMEOUT_SECONDS)
+    try:
+        return sympy.simplify(expr)
+    except SimplifyTimeoutError:
+        return expr
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 
 def get_complexity(expr: Basic) -> int:

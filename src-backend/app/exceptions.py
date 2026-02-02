@@ -34,3 +34,8 @@ class ExpressionTaskNotFoundError(DomainError):
     def __init__(self, task_id: str):
         super().__init__(f"Task not found: {task_id}")
         self.task_id = task_id
+
+
+class SimplifyTimeoutError(DomainError):
+    def __init__(self):
+        super().__init__("simplify_expr timed out after 10 seconds")

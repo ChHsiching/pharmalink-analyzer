@@ -1,6 +1,9 @@
+import time
+
 import sympy
 from sympy import symbols, sin, cos
 
+from app.exceptions import SimplifyTimeoutError
 from app.ml.expression_tree import (
     sympy_to_tree,
     simplify_expr,
@@ -96,3 +99,27 @@ def test_nested_function():
     assert result["type"] == "function"
     assert result["value"] == "sin"
     assert result["children"][0]["value"] == "cos"
+
+
+def test_simplify_expr_timeout_returns_original():
+    """Complex expression (>100 ops) triggers timeout and returns original within 12s."""
+    x = symbols("x")
+    expr = 1
+    for i in range(20):
+        expr = expr * (sin(x + i) + cos(x - i))
+
+    assert get_complexity(expr) > 100, f"Expression too simple: {get_complexity(expr)} ops"
+
+    start = time.monotonic()
+    result = simplify_expr(expr)
+    elapsed = time.monotonic() - start
+
+    assert result == expr, "Should return original expression on timeout"
+    assert elapsed < 12, f"Should have timed out within 12s, took {elapsed:.1f}s"
+
+
+def test_simplify_expr_normal_no_timeout():
+    """Simple expression completes normally without triggering timeout."""
+    expr = x0 + x0 * 0
+    result = simplify_expr(expr)
+    assert result == x0

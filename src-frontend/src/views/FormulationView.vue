@@ -1,44 +1,48 @@
 <template>
   <div class="formulation">
-    <h2>最优配比</h2>
+    <PlPageHeader
+      :step="6"
+      title="最优配比"
+      subtitle="基于注意力权重与表达式寻找最优成分组合"
+    />
 
-    <div class="toolbar">
-      <PlSelect
-        :model-value="selectedCheckpoint"
-        :options="checkpointOptions"
-        label="检查点"
-        @update:model-value="handleCheckpointChange"
-      />
-      <PlSelect
-        v-if="expressionOptions.length"
-        :model-value="selectedExprId"
-        :options="expressionOptions"
-        label="表达式"
-        @update:model-value="handleExpressionChange"
-      />
-      <PlInput
-        :model-value="topK"
-        type="number"
-        label="Top K"
-        @update:model-value="topK = Number($event)"
-      />
-      <PlInput
-        :model-value="nSamples"
-        type="number"
-        label="采样数"
-        @update:model-value="nSamples = Number($event)"
-      />
-      <PlButton
-        variant="primary"
-        :disabled="!selectedExprId || loading"
-        @click="runFormulation"
-      >
-        开始寻优
-      </PlButton>
-      <PlButton v-if="result" variant="secondary" @click="exportCsv">
-        导出 CSV
-      </PlButton>
-    </div>
+    <!-- Config toolbar -->
+    <PlCard variant="base" padding="md" class="formulation__toolbar-card">
+      <div class="toolbar">
+        <PlSelect
+          :model-value="selectedCheckpoint"
+          :options="checkpointOptions"
+          label="检查点"
+          @update:model-value="handleCheckpointChange"
+        />
+        <PlSelect
+          v-if="expressionOptions.length"
+          :model-value="selectedExprId"
+          :options="expressionOptions"
+          label="表达式"
+          @update:model-value="handleExpressionChange"
+        />
+        <PlInput
+          :model-value="topK"
+          type="number"
+          label="Top K"
+          @update:model-value="topK = Number($event)"
+        />
+        <PlInput
+          :model-value="nSamples"
+          type="number"
+          label="采样数"
+          @update:model-value="nSamples = Number($event)"
+        />
+        <PlButton
+          variant="primary"
+          :disabled="!selectedExprId || loading"
+          @click="runFormulation"
+        >
+          开始寻优
+        </PlButton>
+      </div>
+    </PlCard>
 
     <PlEmptyState
       v-if="!selectedExprId && !expressionOptions.length"
@@ -58,51 +62,82 @@
       </div>
 
       <template v-if="result">
-        <PlCard variant="base" padding="md">
-          <h3>注意力权重</h3>
+        <!-- 2-col grid: Radar chart + Candidates table -->
+        <div class="formulation__grid">
+          <PlCard variant="base" padding="md">
+            <h3 class="card-title">候选配比对比</h3>
+            <v-chart
+              class="chart"
+              :option="radarOption"
+              theme="pharmalink"
+              autoresize
+            />
+          </PlCard>
+
+          <PlCard variant="base" padding="md">
+            <div class="card-header">
+              <h3 class="card-title">候选配比</h3>
+              <PlButton variant="secondary" @click="exportCsv">
+                <PlIcon name="download" size="sm" />
+                导出 CSV
+              </PlButton>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>排名</th>
+                    <th v-for="f in result.feature_names" :key="f">{{ f }}</th>
+                    <th>预测药效指标值</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="c in result.candidates"
+                    :key="c.rank"
+                    :class="{ highlight: c.rank === 1 }"
+                  >
+                    <td>
+                      <PlBadge
+                        v-if="c.rank === 1"
+                        text="Best"
+                        variant="teal"
+                      />
+                      <template v-else>{{ c.rank }}</template>
+                    </td>
+                    <td v-for="f in result.feature_names" :key="f">
+                      {{ c.components[f].toFixed(4) }}
+                    </td>
+                    <td class="td--response">
+                      {{ c.predicted_response.toFixed(4) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </PlCard>
+        </div>
+
+        <!-- Full-width: Attention weights bar chart -->
+        <PlCard variant="base" padding="md" class="formulation__attention-card">
+          <h3 class="card-title">注意力权重</h3>
           <v-chart
+            class="chart chart--attention"
             :option="attentionOption"
+            theme="pharmalink"
             autoresize
-            style="height: 260px"
-          />
-        </PlCard>
-
-        <PlCard variant="base" padding="md">
-          <h3>候选配比</h3>
-          <table class="result-table">
-            <thead>
-              <tr>
-                <th>排名</th>
-                <th v-for="f in result.feature_names" :key="f">{{ f }}</th>
-                <th>预测药效</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="c in result.candidates"
-                :key="c.rank"
-                :class="{ highlight: c.rank === 1 }"
-              >
-                <td>{{ c.rank }}</td>
-                <td v-for="f in result.feature_names" :key="f">
-                  {{ c.components[f].toFixed(4) }}
-                </td>
-                <td>{{ c.predicted_response.toFixed(4) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </PlCard>
-
-        <PlCard variant="base" padding="md">
-          <h3>候选配比对比</h3>
-          <v-chart
-            :option="radarOption"
-            autoresize
-            style="height: 360px"
           />
         </PlCard>
       </template>
     </template>
+
+    <!-- Footer: prev navigation only (last step) -->
+    <div class="formulation__footer">
+      <PlButton variant="secondary" @click="goPrev">
+        <PlIcon name="arrow-left" size="sm" />
+        上一步：模型评估
+      </PlButton>
+    </div>
   </div>
 </template>
 
@@ -126,6 +161,9 @@ import PlCard from "@/components/PlCard.vue";
 import PlEmptyState from "@/components/PlEmptyState.vue";
 import PlSpinner from "@/components/PlSpinner.vue";
 import PlToast from "@/components/PlToast.vue";
+import PlPageHeader from "@/components/PlPageHeader.vue";
+import PlIcon from "@/components/PlIcon.vue";
+import PlBadge from "@/components/PlBadge.vue";
 
 import { CHART_PALETTE } from "@/utils/chart-palette";
 import { useWorkflow } from "@/composables/useWorkflow";
@@ -197,6 +235,10 @@ async function runFormulation() {
   await formulate(selectedExprId.value, topK.value, nSamples.value);
 }
 
+function goPrev() {
+  router.push({ name: "evaluation" });
+}
+
 const attentionOption = computed(() => {
   if (!result.value) return {};
   const entries = Object.entries(result.value.attention_weights).sort(
@@ -205,7 +247,7 @@ const attentionOption = computed(() => {
   return {
     tooltip: { trigger: "axis" },
     grid: { left: 100, right: 30, top: 10, bottom: 30 },
-    xAxis: { type: "value", name: "权重" },
+    xAxis: { type: "value", name: "注意力权重" },
     yAxis: {
       type: "category",
       data: entries.map((e) => e[0]),
@@ -266,59 +308,129 @@ onMounted(async () => {
 
 <style scoped>
 .formulation {
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: 20px;
-  font-family: system-ui, sans-serif;
+  padding: var(--space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  font-family: var(--font-family);
 }
 
-h2 {
-  color: var(--color-ink);
-}
-
-h3 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: var(--color-charcoal);
+/* -- Toolbar card -- */
+.formulation__toolbar-card {
+  display: flex;
+  flex-direction: column;
 }
 
 .toolbar {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: flex-end;
-  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
+/* -- Warning banner -- */
 .warning-banner {
-  padding: 10px 14px;
+  padding: var(--space-3) var(--space-4);
   background: var(--color-tint-sky);
   border-left: 3px solid var(--color-link-blue);
   border-radius: var(--radius-sm);
-  margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-line);
   color: var(--color-charcoal);
 }
 
-.result-table {
+/* -- 2-col grid: Radar + Candidates table -- */
+.formulation__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+@media (max-width: 960px) {
+  .formulation__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -- Card title -- */
+.card-title {
+  font-size: var(--text-h3);
+  font-weight: var(--text-h3-weight);
+  color: var(--color-charcoal);
+  margin: 0 0 var(--space-3);
+}
+
+/* -- Card header with title + action -- */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.card-header .card-title {
+  margin-bottom: 0;
+}
+
+/* -- Chart sizing -- */
+.chart {
+  height: 360px;
   width: 100%;
+}
+
+.chart--attention {
+  height: 300px;
+}
+
+/* -- Table (styled to match design system) -- */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
   border-collapse: collapse;
-  font-size: 13px;
+  width: 100%;
+  font-size: var(--text-xs);
 }
 
-.result-table th,
-.result-table td {
+th,
+td {
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-hairline);
-  padding: 6px 10px;
   text-align: center;
+  white-space: nowrap;
 }
 
-.result-table th {
+th {
   background: var(--color-surface);
+  font-weight: var(--text-sm-weight);
+  font-size: var(--text-sm);
+  color: var(--color-charcoal);
 }
 
-.result-table tr.highlight {
+tr.highlight {
   background: var(--color-tint-mint);
-  font-weight: bold;
+  font-weight: 600;
+}
+
+.td--response {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* -- Attention weights full-width card -- */
+.formulation__attention-card {
+  /* full span */
+}
+
+/* -- Footer: prev navigation -- */
+.formulation__footer {
+  display: flex;
+  justify-content: flex-start;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-hairline);
 }
 </style>

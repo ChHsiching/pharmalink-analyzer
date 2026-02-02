@@ -162,22 +162,24 @@ def test_quick_preset_params():
     cfg = PRESET_CONFIG["quick"]
     assert cfg["population_size"] == 500
     assert cfg["generations"] == 30
-    assert cfg["parsimony_coefficient"] == 0.01
+    assert cfg["parsimony_coefficient"] == 0.001
+    assert cfg["init_depth"] == (2, 6)
 
 
 def test_standard_preset_params():
     cfg = PRESET_CONFIG["standard"]
-    assert cfg["population_size"] == 2000
-    assert cfg["generations"] == 80
-    assert cfg["parsimony_coefficient"] == 0.005
-    assert cfg["init_depth"] == (4, 10)
+    assert cfg["population_size"] == 1000
+    assert cfg["generations"] == 50
+    assert cfg["parsimony_coefficient"] == 0.0005
+    assert cfg["init_depth"] == (2, 6)
 
 
 def test_thorough_preset_params():
     cfg = PRESET_CONFIG["thorough"]
     assert cfg["population_size"] == 2000
-    assert cfg["generations"] == 100
-    assert cfg["parsimony_coefficient"] == 0.001
+    assert cfg["generations"] == 80
+    assert cfg["parsimony_coefficient"] == 0.0002
+    assert cfg["init_depth"] == (2, 8)
 
 
 def test_preset_overrides_regressor_params():
@@ -190,7 +192,7 @@ def test_preset_overrides_regressor_params():
         call_kwargs = MockSR.call_args[1]
         assert call_kwargs["population_size"] == 500
         assert call_kwargs["generations"] == 30
-        assert call_kwargs["parsimony_coefficient"] == 0.01
+        assert call_kwargs["parsimony_coefficient"] == 0.001
 
 
 def test_invalid_preset_defaults_to_standard():
@@ -201,8 +203,8 @@ def test_invalid_preset_defaults_to_standard():
     with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
         run_symbolic_regression(X, y, ["a", "b"], preset="nonexistent")
         call_kwargs = MockSR.call_args[1]
-        assert call_kwargs["population_size"] == 2000
-        assert call_kwargs["generations"] == 80
+        assert call_kwargs["population_size"] == 1000
+        assert call_kwargs["generations"] == 50
 
 
 # ---------------------------------------------------------------------------
@@ -224,11 +226,11 @@ def test_parsimony_coefficients_derived_from_preset():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"])
     actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
-    assert sorted(actual_parsimonies) == [0.0, 0.005, 0.02]
+    assert sorted(actual_parsimonies) == [0.0, 0.0005, 0.002]
 
 
 def test_parsimony_coefficients_quick_preset():
-    """Quick preset (0.01) should produce parsimony coefficients [0.0, 0.01, 0.04]."""
+    """Quick preset (0.001) should produce parsimony coefficients [0.0, 0.001, 0.004]."""
     from app.ml.symbolic_regressor import run_pareto_regression
     X = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
     y = np.array([1.0, 2.0, 3.0], dtype=np.float32)
@@ -241,7 +243,7 @@ def test_parsimony_coefficients_quick_preset():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"], preset="quick")
     actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
-    assert sorted(actual_parsimonies) == [0.0, 0.01, 0.04]
+    assert sorted(actual_parsimonies) == [0.0, 0.001, 0.004]
 
 
 def test_pareto_regression_returns_three_models():
@@ -274,7 +276,7 @@ def test_pareto_regression_uses_different_parsimony():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"])
     actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
-    assert sorted(actual_parsimonies) == [0.0, 0.005, 0.02]
+    assert sorted(actual_parsimonies) == [0.0, 0.0005, 0.002]
 
 
 def test_pareto_regression_gplearn_missing():
@@ -336,13 +338,6 @@ def test_preset_config_has_const_range():
         assert cfg["const_range"][0] < cfg["const_range"][1]
 
 
-def test_init_depth_wider_than_before():
-    for preset_name, cfg in PRESET_CONFIG.items():
-        assert cfg["init_depth"][1] >= 8, (
-            f"Preset '{preset_name}' init_depth max {cfg['init_depth'][1]} < 8"
-        )
-
-
 def test_const_range_wider_than_before():
     for preset_name, cfg in PRESET_CONFIG.items():
         assert abs(cfg["const_range"][0]) >= 2.0, (
@@ -361,7 +356,7 @@ def test_init_depth_forwarded_to_regressor():
     with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
         run_symbolic_regression(X, y, ["a", "b"], preset="quick")
         call_kwargs = MockSR.call_args[1]
-        assert call_kwargs["init_depth"] == (2, 8)
+        assert call_kwargs["init_depth"] == (2, 6)
 
 
 def test_const_range_forwarded_to_regressor():
@@ -389,5 +384,5 @@ def test_pareto_forwards_init_depth():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"], preset="quick")
         for call in MockSR.call_args_list:
-            assert call[1]["init_depth"] == (2, 8)
+            assert call[1]["init_depth"] == (2, 6)
             assert call[1]["const_range"] == (-2.0, 2.0)

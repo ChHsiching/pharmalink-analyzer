@@ -100,13 +100,19 @@ class ExpressionPipeline:
                     "loss": eq["loss"],
                     "r2_score": r2,
                 })
-            best_eq = pareto_equations[-1]
+            best_r2 = max(eq["r2_score"] for eq in pareto_equations)
+            threshold = best_r2 * 0.9
+            best_idx = next(
+                i for i, eq in enumerate(pareto_equations)
+                if eq["r2_score"] >= threshold
+            )
+            best_eq = pareto_equations[best_idx]
         except Exception as e:
             raise SymbolicRegressionError(
                 f"Equation extraction failed: {e}"
             ) from e
 
-        best_model = models[-1]
+        best_model = models[best_idx]
         y_train_pred = best_model.predict(X_train)
         y_test_pred = best_model.predict(X_test)
 

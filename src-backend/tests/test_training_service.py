@@ -250,3 +250,18 @@ class TestProgressQueues:
         service._loop.close()
 
         assert service._progress[-1] == progress
+
+
+class TestTaskIdFormat:
+    @pytest.mark.asyncio
+    async def test_task_id_is_14_digit_timestamp(self, service):
+        config = TrainingConfig(
+            dataset_id="fruit-test-tc",
+            d_model=32, n_heads=2, n_layers=1,
+            epochs=5, k_folds=2,
+            augmentation=AugmentationConfig(enabled=False),
+        )
+        import re
+
+        task_id = await service.start_training(config)
+        assert re.match(r"^\d{14}$", task_id), f"task_id '{task_id}' is not a 14-digit timestamp"

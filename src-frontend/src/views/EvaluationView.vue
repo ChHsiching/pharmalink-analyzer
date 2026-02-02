@@ -1,8 +1,13 @@
 <template>
   <div class="evaluation">
-    <h2>模型评估</h2>
+    <PlPageHeader
+      :step="5"
+      title="模型评估"
+      subtitle="评估模型预测性能与泛化能力"
+    />
 
-    <div class="toolbar">
+    <!-- Toolbar: checkpoint selection -->
+    <div class="evaluation__toolbar">
       <PlSelect
         :model-value="selectedCheckpoint"
         :options="checkpointOptions"
@@ -12,79 +17,116 @@
       <PlButton variant="primary" :disabled="!selectedCheckpoint" :loading="loading" @click="evaluate">
         评估
       </PlButton>
-      <PlSpinner v-if="loading" size="sm" />
-      <PlToast v-if="error" :message="error" variant="error" />
     </div>
 
-    <div v-if="metrics" class="metrics-bar">
+    <!-- Metrics row: 3-col grid -->
+    <div v-if="metrics" class="evaluation__metrics">
       <PlStatCard
         label="R²"
         :value="`${metrics.aggregate.r2_mean.toFixed(4)} ± ${metrics.aggregate.r2_std.toFixed(4)}`"
         variant="mint"
       />
       <PlStatCard
-        label="MSE"
-        :value="`${metrics.aggregate.mse_mean.toFixed(4)} ± ${metrics.aggregate.mse_std.toFixed(4)}`"
-        variant="lavender"
+        label="RMSE"
+        :value="rmseDisplay"
+        variant="sky"
       />
       <PlStatCard
         label="MAE"
         :value="`${metrics.aggregate.mae_mean.toFixed(4)} ± ${metrics.aggregate.mae_std.toFixed(4)}`"
-        variant="sky"
+        variant="peach"
       />
     </div>
 
-    <div v-if="metrics" class="charts-grid">
+    <!-- Charts row: 2-col grid (scatter + residuals) -->
+    <div v-if="metrics" class="evaluation__charts-row">
       <PlCard variant="base" padding="md">
-        <h3>Predicted vs Actual</h3>
-        <v-chart :option="scatterOption" autoresize style="height: 300px" />
+        <h3 class="card-title">Predicted vs Actual</h3>
+        <v-chart
+          class="chart"
+          :option="scatterOption"
+          theme="pharmalink"
+          autoresize
+        />
       </PlCard>
-
       <PlCard variant="base" padding="md">
-        <h3>残差分布</h3>
-        <v-chart :option="histogramOption" autoresize style="height: 300px" />
+        <h3 class="card-title">残差分布</h3>
+        <v-chart
+          class="chart"
+          :option="histogramOption"
+          theme="pharmalink"
+          autoresize
+        />
       </PlCard>
+    </div>
 
-      <PlCard variant="base" padding="md">
-        <h3>训练损失曲线</h3>
-        <v-chart :option="lossCurveOption" autoresize style="height: 300px" />
-      </PlCard>
+    <!-- Full-width: Loss curves -->
+    <PlCard v-if="metrics && lossCurve?.folds.length" variant="base" padding="md" class="evaluation__full-card">
+      <h3 class="card-title">训练损失曲线</h3>
+      <v-chart
+        class="chart chart--lg"
+        :option="lossCurveOption"
+        theme="pharmalink"
+        autoresize
+      />
+    </PlCard>
 
-      <PlCard variant="base" padding="md">
-        <h3>K-Fold 指标</h3>
-        <table class="metrics-table">
+    <!-- Full-width: K-Fold table -->
+    <PlCard v-if="metrics" variant="base" padding="md" class="evaluation__full-card">
+      <h3 class="card-title">K-Fold 评估指标</h3>
+      <div class="table-wrapper">
+        <table class="kfold-table">
           <thead>
             <tr>
               <th>Fold</th>
-              <th>R2</th>
-              <th>MSE</th>
+              <th>R²</th>
+              <th>RMSE</th>
               <th>MAE</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="f in metrics.folds" :key="f.fold">
-              <td>{{ f.fold }}</td>
-              <td>{{ f.r2.toFixed(4) }}</td>
-              <td>{{ f.mse.toFixed(4) }}</td>
-              <td>{{ f.mae.toFixed(4) }}</td>
+              <td class="td--fold">{{ f.fold }}</td>
+              <td class="td--num">{{ f.r2.toFixed(4) }}</td>
+              <td class="td--num">{{ Math.sqrt(f.mse).toFixed(4) }}</td>
+              <td class="td--num">{{ f.mae.toFixed(4) }}</td>
             </tr>
           </tbody>
           <tfoot>
             <tr>
-              <td>Mean ± Std</td>
-              <td>{{ metrics.aggregate.r2_mean.toFixed(4) }} ± {{ metrics.aggregate.r2_std.toFixed(4) }}</td>
-              <td>{{ metrics.aggregate.mse_mean.toFixed(4) }} ± {{ metrics.aggregate.mse_std.toFixed(4) }}</td>
-              <td>{{ metrics.aggregate.mae_mean.toFixed(4) }} ± {{ metrics.aggregate.mae_std.toFixed(4) }}</td>
+              <td class="td--summary">Mean ± Std</td>
+              <td class="td--num">
+                {{ metrics.aggregate.r2_mean.toFixed(4) }} ± {{ metrics.aggregate.r2_std.toFixed(4) }}
+              </td>
+              <td class="td--num">{{ rmseDisplay }}</td>
+              <td class="td--num">
+                {{ metrics.aggregate.mae_mean.toFixed(4) }} ± {{ metrics.aggregate.mae_std.toFixed(4) }}
+              </td>
             </tr>
           </tfoot>
         </table>
-      </PlCard>
+      </div>
+    </PlCard>
+
+    <!-- Footer: prev/next navigation -->
+    <div class="evaluation__footer">
+      <PlButton variant="secondary" @click="goPrev">
+        <PlIcon name="arrow-left" size="sm" />
+        上一步：表达推导
+      </PlButton>
+      <PlButton variant="dark" @click="goNext">
+        下一步：处方优化
+        <PlIcon name="arrow-right" size="sm" />
+      </PlButton>
     </div>
+
+    <PlToast v-if="error" :message="error" variant="error" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import VChart from "vue-echarts";
 import { use } from "echarts/core";
 import { ScatterChart, LineChart, BarChart } from "echarts/charts";
@@ -97,10 +139,13 @@ import PlSelect from "@/components/PlSelect.vue";
 import PlButton from "@/components/PlButton.vue";
 import PlCard from "@/components/PlCard.vue";
 import PlStatCard from "@/components/PlStatCard.vue";
-import PlSpinner from "@/components/PlSpinner.vue";
 import PlToast from "@/components/PlToast.vue";
+import PlPageHeader from "@/components/PlPageHeader.vue";
+import PlIcon from "@/components/PlIcon.vue";
 
 use([ScatterChart, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
+
+const router = useRouter();
 
 const {
   metrics, predictions, residuals, lossCurve,
@@ -114,6 +159,13 @@ const checkpointOptions = computed(() =>
   checkpoints.value.map((cp) => ({ value: cp.id, label: `${cp.id} (loss: ${cp.final_loss.toFixed(4)})` }))
 );
 
+const rmseDisplay = computed(() => {
+  if (!metrics.value) return "--";
+  const rmseMean = Math.sqrt(metrics.value.aggregate.mse_mean);
+  const rmseStd = Math.sqrt(metrics.value.aggregate.mse_std);
+  return `${rmseMean.toFixed(4)} ± ${rmseStd.toFixed(4)}`;
+});
+
 onMounted(() => {
   fetchCheckpoints();
 });
@@ -121,6 +173,14 @@ onMounted(() => {
 async function evaluate() {
   if (!selectedCheckpoint.value) return;
   await fetchAll(selectedCheckpoint.value);
+}
+
+function goPrev() {
+  router.push({ name: "expression" });
+}
+
+function goNext() {
+  router.push({ name: "formulation" });
 }
 
 const scatterOption = computed(() => {
@@ -206,62 +266,122 @@ const lossCurveOption = computed(() => {
 
 <style scoped>
 .evaluation {
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: 20px;
-  font-family: system-ui, sans-serif;
-}
-
-.toolbar {
+  padding: var(--space-10);
   display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 16px;
+  flex-direction: column;
+  gap: var(--space-6);
+  font-family: var(--font-family);
 }
 
-.metrics-bar {
+/* -- Toolbar -- */
+.evaluation__toolbar {
   display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--space-3);
+  align-items: flex-end;
 }
 
-.charts-grid {
+/* -- Metrics row: 3-col grid -- */
+.evaluation__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .evaluation__metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -- Charts row: 2-col grid -- */
+.evaluation__charts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
-.charts-grid h3 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
+@media (max-width: 960px) {
+  .evaluation__charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -- Card title -- */
+.card-title {
+  font-size: var(--text-h3);
+  font-weight: var(--text-h3-weight);
+  color: var(--color-charcoal);
+  margin: 0 0 var(--space-3);
+}
+
+/* -- Chart sizing -- */
+.chart {
+  height: 300px;
+  width: 100%;
+}
+
+.chart--lg {
+  height: 350px;
+}
+
+/* -- Full-width card -- */
+.evaluation__full-card {
+  width: 100%;
+}
+
+/* -- K-Fold table -- */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.kfold-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+
+.kfold-table th,
+.kfold-table td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-hairline);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.kfold-table th {
+  background: var(--color-surface);
+  font-weight: var(--text-sm-weight);
+  font-size: var(--text-sm);
   color: var(--color-charcoal);
 }
 
-.metrics-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.metrics-table th,
-.metrics-table td {
-  border: 1px solid var(--color-hairline);
-  padding: 6px 10px;
-  text-align: center;
-}
-
-.metrics-table th {
-  background: var(--color-surface);
-}
-
-.metrics-table tfoot td {
-  font-weight: bold;
+.kfold-table tfoot td {
+  font-weight: 600;
   background: var(--color-surface-soft);
 }
 
-@media (max-width: 1024px) {
-  .charts-grid {
-    grid-template-columns: 1fr;
-  }
+.td--fold {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.td--num {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}
+
+.td--summary {
+  font-weight: 600;
+  color: var(--color-charcoal);
+}
+
+/* -- Footer: prev/next navigation -- */
+.evaluation__footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-hairline);
 }
 </style>

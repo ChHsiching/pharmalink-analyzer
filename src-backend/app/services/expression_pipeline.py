@@ -103,8 +103,10 @@ class ExpressionPipeline:
             best_r2 = max(eq["r2_score"] for eq in pareto_equations)
             threshold = best_r2 * 0.9
             best_idx = next(
-                i for i, eq in enumerate(pareto_equations)
-                if eq["r2_score"] >= threshold
+                (i for i, eq in enumerate(pareto_equations)
+                 if eq["r2_score"] >= threshold),
+                max(range(len(pareto_equations)),
+                    key=lambda i: pareto_equations[i]["r2_score"]),
             )
             best_eq = pareto_equations[best_idx]
         except Exception as e:

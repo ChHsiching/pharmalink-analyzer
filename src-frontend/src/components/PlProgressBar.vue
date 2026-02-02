@@ -19,10 +19,10 @@ withDefaults(defineProps<{
 .pl-progress {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .pl-progress__label {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--color-slate);
 }
 .pl-progress__track {

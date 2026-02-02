@@ -1,7 +1,7 @@
 """TrainingService — facade orchestrating pipeline, checkpoint manager, async tasks, and WebSocket."""
 
 import asyncio
-import uuid
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -72,7 +72,7 @@ class TrainingService:
                 f"Dataset '{config.dataset_id}' has no target variable selected. "
                 "Select a target variable before training."
             )
-        self._task_id = uuid.uuid4().hex[:8]
+        self._task_id = datetime.now().strftime("%Y%m%d%H%M%S")
         self._config = config
         self._status = "running"
         self._stop_requested = False

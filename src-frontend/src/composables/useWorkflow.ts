@@ -56,7 +56,7 @@ export function useWorkflow() {
     analysis: state.hasCheckpoint,
     expression: state.hasCheckpoint,
     evaluation: state.hasCheckpoint,
-    formulation: state.currentExprId !== "",
+    formulation: state.hasCheckpoint,
   }));
 
   function markDatasetsAvailable() {

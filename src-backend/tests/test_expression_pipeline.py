@@ -197,10 +197,10 @@ class TestPipelineRun:
         result = pipeline.run("model-abc")
 
         assert isinstance(result, PipelineResult)
-        assert result.latex == "A^{2} + B^{2} + 1"
-        assert result.complexity == 7
-        assert result.loss == 0.005
-        assert result.r2_score == 0.95
+        assert result.latex == "A^{2} + 1"
+        assert result.complexity == 5
+        assert result.loss == 0.01
+        assert result.r2_score == 0.90
         assert len(result.pareto_equations) == 3
 
     def test_run_raises_on_missing_checkpoint(self, pipeline, checkpoint_dir):
@@ -311,7 +311,7 @@ class TestPipelineRun:
         assert len(result.pareto_equations) == 3
         for eq in result.pareto_equations:
             assert "r2_score" in eq
-        assert result.complexity == 7
+        assert result.complexity == 5
 
     @patch("app.services.expression_pipeline.compute_impact")
     @patch("app.services.expression_pipeline.extract_best_equation")
@@ -343,6 +343,36 @@ class TestPipelineRun:
         assert np.all(np.abs(X_received.mean(axis=0) - 1.0) < 0.5), (
             f"Features appear scaled (mean ~0): mean={X_received.mean(axis=0)}"
         )
+
+    @patch("app.services.expression_pipeline.compute_impact")
+    @patch("app.services.expression_pipeline.extract_best_equation")
+    @patch("app.services.expression_pipeline.run_pareto_regression")
+    @patch("app.services.expression_pipeline.generate_interaction_features")
+    @patch("app.services.expression_pipeline.extract_top_pairs")
+    @patch("app.services.expression_pipeline.extract_attention_weights")
+    def test_selection_picks_best_r2_complexity_tradeoff(
+        self, mock_attn, mock_pairs, mock_interact, mock_pareto_reg, mock_best, mock_impact,
+        pipeline, checkpoint_dir,
+    ):
+        """Pipeline should select the simplest equation with R2 within 10% of best R2."""
+        _write_checkpoint(checkpoint_dir)
+        mock_attn.return_value = _fake_attention_matrix()
+        mock_pairs.return_value = (_fake_pairs(), 0.5)
+        mock_interact.return_value = (
+            np.zeros((20, 5)),
+            ["A", "B", "C", "A_mul_B", "B_mul_C"],
+        )
+        _setup_pareto_mocks(mock_pareto_reg, mock_best)
+        mock_impact.return_value = {"A": 0.5, "B": 0.3, "C": 0.2}
+
+        result = pipeline.run("model-abc")
+
+        # eq[0]: R2=0.80, eq[1]: R2=0.90, eq[2]: R2=0.95
+        # threshold = 0.95 * 0.9 = 0.855
+        # eq[1] (R2=0.90 >= 0.855) should be selected, NOT eq[2] (most complex)
+        assert result.complexity == 5
+        assert result.r2_score == pytest.approx(0.90)
+        assert result.latex == "A^{2} + 1"
 
 
 # ---------------------------------------------------------------------------

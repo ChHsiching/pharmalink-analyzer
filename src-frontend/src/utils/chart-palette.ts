@@ -1,17 +1,21 @@
 export const CHART_PALETTE = [
   "#3d8b7a",
-  "#5a8fa8",
-  "#5b6abf",
+  "#2a9d99",
+  "#6bb5a5",
   "#dd5b00",
-  "#7b3ff2",
+  "#ff64c8",
+  "#0075de",
+  "#f5d75e",
 ] as const;
 
 export const CHART_COLORS = {
   primary: "#3d8b7a",
-  sky: "#5a8fa8",
-  indigo: "#5b6abf",
+  teal: "#2a9d99",
+  soft: "#6bb5a5",
   orange: "#dd5b00",
-  purple: "#7b3ff2",
+  pink: "#ff64c8",
+  blue: "#0075de",
+  yellow: "#f5d75e",
   success: "#1aae39",
   warning: "#dd5b00",
   error: "#e03131",

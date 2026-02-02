@@ -104,6 +104,18 @@
   --stepnav-height: 3.25rem;
 }
 
+  /* === Legacy Aliases (for gradual migration) === */
+  --font-size-body: var(--text-body);
+  --font-size-body-md: var(--text-body-lg);
+  --font-size-heading: var(--text-h3);
+  --font-size-heading-md: var(--text-h2);
+  --font-size-caption: var(--text-xs);
+  --font-weight-body: var(--text-body-weight);
+  --font-weight-medium: 500;
+  --font-weight-heading: var(--text-h3-weight);
+  --line-height-body: var(--text-body-line);
+}
+
 html {
   font-size: 14px;
 }

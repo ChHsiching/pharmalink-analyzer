@@ -1,72 +1,123 @@
 <template>
   <div class="expression-derivation">
-    <h2>表达式推导</h2>
-    <div class="toolbar">
-      <PlSelect
-        :model-value="selectedCheckpoint"
-        :options="checkpointOptions"
-        label="检查点"
-        @update:model-value="selectedCheckpoint = $event"
-      />
-      <PlSelect
-        :model-value="selectedPreset"
-        :options="presetOptions"
-        label="预设"
-        @update:model-value="selectedPreset = $event"
-      />
-      <PlButton
-        variant="primary"
-        :disabled="!selectedCheckpoint || loading"
-        @click="generate"
-      >
-        生成表达式
-      </PlButton>
-      <template v-if="expression">
-        <PlButton variant="secondary" :disabled="loading" @click="simplify">精简</PlButton>
-        <PlButton variant="secondary" :disabled="loading" @click="optimize">
-          优化<template v-if="expression?.pareto_count"> ({{ expression.pareto_index + 1 }}/{{ expression.pareto_count }})</template>
-        </PlButton>
-        <PlButton variant="ghost" :disabled="loading || !canUndo" @click="undo">撤销</PlButton>
-        <PlButton variant="ghost" :disabled="loading || !canRedo" @click="redo">重做</PlButton>
-      </template>
-    </div>
-    <div v-if="loading" class="status-area">
-      <PlSpinner size="sm" />
-      <span class="loading-text">{{ loadingMessage }}</span>
-    </div>
-    <PlToast v-if="error" :message="error" variant="error" />
-    <template v-if="expression">
-      <div class="indicators-grid" v-if="expression?.indicators && Object.keys(expression.indicators).length > 0">
-        <PlStatCard
-          v-for="(value, key) in expression.indicators"
-          :key="key"
-          :label="formatIndicatorLabel(key as string)"
-          :value="formatIndicatorValue(key as string, value)"
-          :variant="indicatorVariant(key as string)"
+    <PlPageHeader
+      :step="4"
+      title="表达式推导"
+      subtitle="基于符号回归推导数学表达式"
+    />
+
+    <div class="expression-derivation__grid">
+      <!-- Left panel (1fr): Regression config -->
+      <PlCard variant="base" padding="md" class="expression-derivation__left">
+        <h3 class="card-title">回归配置</h3>
+
+        <PlSelect
+          :model-value="selectedCheckpoint"
+          :options="checkpointOptions"
+          label="检查点"
+          @update:model-value="selectedCheckpoint = $event"
         />
-      </div>
-      <div class="panels">
-        <PlCard variant="base" padding="md" class="panel latex-panel">
-          <h3>符号表达式</h3>
-          <div ref="katexRef" class="katex-container"></div>
-        </PlCard>
-        <PlCard variant="base" padding="md" class="panel tree-panel">
-          <h3>表达式树</h3>
-          <div class="tree-container">
-            <TreeNode :node="expression.tree" :depth="0" :variable-impact="expression.variable_impact" />
+
+        <PlSelect
+          :model-value="selectedPreset"
+          :options="presetOptions"
+          label="预设"
+          @update:model-value="selectedPreset = $event"
+        />
+
+        <PlButton
+          variant="primary"
+          :disabled="!selectedCheckpoint || loading"
+          @click="generate"
+        >
+          生成表达式
+        </PlButton>
+
+        <template v-if="expression">
+          <div class="action-group">
+            <PlButton variant="secondary" :disabled="loading" @click="simplify">
+              精简
+            </PlButton>
+            <PlButton variant="secondary" :disabled="loading" @click="optimize">
+              优化<template v-if="expression?.pareto_count"> ({{ expression.pareto_index + 1 }}/{{ expression.pareto_count }})</template>
+            </PlButton>
           </div>
-        </PlCard>
-      </div>
-      <PlCard v-if="impactChartOption" variant="base" padding="md" class="impact-panel">
-        <h3>成分影响力</h3>
-        <VChart :option="impactChartOption" class="impact-chart" autoresize />
+          <div class="action-group">
+            <PlButton variant="ghost" :disabled="loading || !canUndo" @click="undo">
+              撤销
+            </PlButton>
+            <PlButton variant="ghost" :disabled="loading || !canRedo" @click="redo">
+              重做
+            </PlButton>
+          </div>
+        </template>
       </PlCard>
-    </template>
+
+      <!-- Right panel (2fr): Results -->
+      <div class="expression-derivation__right">
+        <!-- Loading / Error -->
+        <div v-if="loading" class="status-area">
+          <PlSpinner size="sm" />
+          <span class="status-text">{{ loadingMessage }}</span>
+        </div>
+        <PlToast v-if="error" :message="error" variant="error" />
+
+        <template v-if="expression">
+          <!-- Indicators grid -->
+          <div
+            v-if="expression?.indicators && Object.keys(expression.indicators).length > 0"
+            class="indicators-grid"
+          >
+            <PlStatCard
+              v-for="(value, key) in expression.indicators"
+              :key="key"
+              :label="formatIndicatorLabel(key as string)"
+              :value="formatIndicatorValue(key as string, value)"
+              :variant="indicatorVariant(key as string)"
+            />
+          </div>
+
+          <!-- KaTeX expression card -->
+          <PlCard variant="base" padding="md" class="latex-card">
+            <h3 class="card-title">数学表达式</h3>
+            <div ref="katexRef" class="katex-container"></div>
+          </PlCard>
+
+          <!-- Bottom row: expression tree + variable impact chart -->
+          <div class="bottom-row">
+            <PlCard variant="base" padding="md" class="tree-card">
+              <h3 class="card-title">表达式树</h3>
+              <div class="tree-container">
+                <TreeNode :node="expression.tree" :depth="0" :variable-impact="expression.variable_impact" />
+              </div>
+            </PlCard>
+
+            <PlCard v-if="impactChartOption" variant="base" padding="md" class="impact-card">
+              <h3 class="card-title">影响力</h3>
+              <VChart :option="impactChartOption" theme="pharmalink" class="impact-chart" autoresize />
+            </PlCard>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Footer: prev/next navigation -->
+    <div class="expression-derivation__footer">
+      <PlButton variant="secondary" @click="goPrev">
+        <PlIcon name="arrow-left" size="sm" />
+        上一步：注意力分析
+      </PlButton>
+      <PlButton variant="dark" @click="goNext">
+        下一步：模型评估
+        <PlIcon name="arrow-right" size="sm" />
+      </PlButton>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
+import { useRouter } from "vue-router";
 import katex from "katex";
 import { useTraining } from "@/composables/useTraining";
 import { useExpression } from "@/composables/useExpression";
@@ -87,9 +138,13 @@ import PlCard from "@/components/PlCard.vue";
 import PlStatCard from "@/components/PlStatCard.vue";
 import PlSpinner from "@/components/PlSpinner.vue";
 import PlToast from "@/components/PlToast.vue";
+import PlPageHeader from "@/components/PlPageHeader.vue";
+import PlIcon from "@/components/PlIcon.vue";
 import { CHART_PALETTE } from "@/utils/chart-palette";
 
 use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
+
+const router = useRouter();
 
 const selectedCheckpoint = ref("");
 const selectedPreset = ref("standard");
@@ -105,6 +160,7 @@ const {
 } = useExpression();
 const { getDataset } = useDatasets();
 const targetName = ref("");
+const featureNames = ref<string[]>([]);
 
 const checkpointOptions = computed(() => [
   { value: "", label: "选择检查点" },
@@ -186,6 +242,14 @@ const impactChartOption = computed(() => {
   };
 });
 
+function replaceFeatureVariables(latex: string): string {
+  if (featureNames.value.length === 0) return latex;
+  return latex.replace(/X(\d+)/g, (_, i) => {
+    const idx = parseInt(i, 10);
+    return featureNames.value[idx] ?? ("X" + i);
+  });
+}
+
 async function generate() {
   if (!selectedCheckpoint.value) return;
   await generateExpression(selectedCheckpoint.value, 10, selectedPreset.value);
@@ -229,19 +293,30 @@ async function redo() {
 
 function renderLatex() {
   if (katexRef.value && expression.value?.latex) {
+    const substituted = replaceFeatureVariables(expression.value.latex);
     const prefix = targetName.value ? `${targetName.value} = ` : "";
-    katex.render(prefix + expression.value.latex, katexRef.value, {
+    katex.render(prefix + substituted, katexRef.value, {
       displayMode: true,
       throwOnError: false,
     });
   }
 }
 
+function goPrev() {
+  router.push({ name: "analysis" });
+}
+
+function goNext() {
+  router.push({ name: "evaluation" });
+}
+
 watch(() => expression.value?.latex, () => nextTick(renderLatex));
 watch(targetName, () => nextTick(renderLatex));
+watch(featureNames, () => nextTick(renderLatex));
 watch(selectedCheckpoint, async (cpId) => {
   if (!cpId) {
     targetName.value = "";
+    featureNames.value = [];
     return;
   }
   const cp = checkpoints.value.find((c) => c.id === cpId);
@@ -249,8 +324,10 @@ watch(selectedCheckpoint, async (cpId) => {
     try {
       const ds = await getDataset(cp.dataset_id);
       targetName.value = ds.target;
+      featureNames.value = ds.feature_names ?? [];
     } catch {
       targetName.value = "";
+      featureNames.value = [];
     }
   }
 });
@@ -260,57 +337,124 @@ onUnmounted(() => { stopPolling(); });
 
 <style scoped>
 .expression-derivation {
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: 20px;
-  font-family: system-ui, sans-serif;
-}
-h2 { color: var(--color-ink); }
-.toolbar {
+  padding: var(--space-10);
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--space-6);
+  font-family: var(--font-family);
 }
+
+/* -- Grid: 1fr config + 2fr results -- */
+.expression-derivation__grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-6);
+}
+
+@media (max-width: 960px) {
+  .expression-derivation__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -- Left panel: Config card -- */
+.expression-derivation__left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.card-title {
+  font-size: var(--text-h3);
+  font-weight: var(--text-h3-weight);
+  color: var(--color-charcoal);
+  margin: 0 0 var(--space-2);
+}
+
+.action-group {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* -- Right panel: Results -- */
+.expression-derivation__right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .status-area {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
 }
-.loading-text {
-  color: var(--color-slate);
-  font-size: var(--font-size-body);
+
+.status-text {
+  font-size: var(--text-sm);
+  color: var(--color-steel);
 }
+
+/* -- Indicators grid -- */
 .indicators-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 8px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
 }
-.panels {
-  display: flex;
-  gap: 20px;
+
+/* -- KaTeX expression card -- */
+.latex-card {
+  min-height: 0;
 }
-.panel { flex: 1; }
-.panel h3 { margin-top: 0; color: var(--color-charcoal); }
+
 .katex-container {
   min-height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow-x: auto;
+  padding: var(--space-3) 0;
 }
+
+/* -- Bottom row: tree + impact chart (2-column) -- */
+.bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 1200px) {
+  .bottom-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tree-card {
+  min-height: 0;
+}
+
 .tree-container {
-  max-height: 500px;
+  max-height: 400px;
   overflow-y: auto;
   font-family: monospace;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
-.impact-panel { margin-top: 20px; }
-.impact-chart { height: 240px; width: 100%; }
-@media (max-width: 1024px) {
-  .panels { flex-direction: column; }
+
+.impact-card {
+  min-height: 0;
+}
+
+.impact-chart {
+  height: 260px;
+  width: 100%;
+}
+
+/* -- Footer: prev/next navigation -- */
+.expression-derivation__footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-hairline);
 }
 </style>

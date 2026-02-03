@@ -178,8 +178,8 @@ const topAttentionWeights = computed<AttentionEntry[]>(() => {
 });
 
 const maxAttentionValue = computed(() => {
-  if (topAttentionWeights.value.length === 0) return 1;
-  return topAttentionWeights.value[0].weight;
+  if (!heatmap.value) return 1;
+  return heatmap.value.max_value;
 });
 
 const heatmapOption = computed(() => {

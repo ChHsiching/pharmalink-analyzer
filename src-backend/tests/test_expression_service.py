@@ -1,6 +1,7 @@
 """Tests for ExpressionService — validates facade orchestration."""
 
 import time
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -87,6 +88,15 @@ class TestGenerate:
         assert result.pareto_count == 3
         assert result.pareto_index == 2
         mock_pipeline.run.assert_called_once_with("model-abc", 10, preset="standard")
+
+    def test_generate_expr_id_is_timestamp_format(self, service):
+        result = service.generate("model-abc")
+        expr_id = result.expr_id
+        assert expr_id.startswith("expr_")
+        suffix = expr_id[len("expr_"):]
+        assert len(suffix) == 14
+        assert suffix.isdigit()
+        datetime.strptime(suffix, "%Y%m%d%H%M%S")
 
     def test_generate_propagates_pipeline_error(self, service, mock_pipeline):
         mock_pipeline.run.side_effect = SymbolicRegressionError("Julia backend not installed")

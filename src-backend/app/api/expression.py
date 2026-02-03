@@ -63,3 +63,11 @@ async def undo_expression(
     service: ExpressionService = Depends(get_expression_service),
 ):
     return service.undo(expr_id, steps)
+
+
+@router.get("")
+async def list_expressions(
+    checkpoint_id: str = Query(...),
+    service: ExpressionService = Depends(get_expression_service),
+):
+    return service.list_by_model(checkpoint_id)

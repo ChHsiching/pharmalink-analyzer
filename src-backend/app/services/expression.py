@@ -191,3 +191,8 @@ class ExpressionService:
     def undo(self, expr_id: str, steps: int = 1) -> ExpressionResponse:
         state = self._state.undo(expr_id, steps)
         return self._to_response(state)
+
+    def list_by_model(self, model_id: str) -> list[dict]:
+        """Return [{expr_id, latex}] for all expressions matching model_id."""
+        states = self._state.list_by_model(model_id)
+        return [{"expr_id": s.expr_id, "latex": s.current_latex} for s in states]

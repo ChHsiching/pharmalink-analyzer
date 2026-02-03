@@ -273,3 +273,34 @@ class TestStateManagerPersistence:
         state = _make_state()
         mgr.put(state)
         assert mgr.get("expr_test") is state
+
+
+class TestStateManagerListByModel:
+
+    def test_filters_by_model_id(self):
+        mgr = ExpressionStateManager()
+        s1 = _make_state("expr_1")
+        s1.model_id = "model_A"
+        s2 = _make_state("expr_2")
+        s2.model_id = "model_B"
+        s3 = _make_state("expr_3")
+        s3.model_id = "model_A"
+        mgr.put(s1)
+        mgr.put(s2)
+        mgr.put(s3)
+
+        result = mgr.list_by_model("model_A")
+        assert len(result) == 2
+        ids = {r.expr_id for r in result}
+        assert ids == {"expr_1", "expr_3"}
+
+    def test_returns_empty_list_for_unknown_model(self):
+        mgr = ExpressionStateManager()
+        mgr.put(_make_state())
+        result = mgr.list_by_model("nonexistent")
+        assert result == []
+
+    def test_returns_empty_list_when_no_states(self):
+        mgr = ExpressionStateManager()
+        result = mgr.list_by_model("any")
+        assert result == []

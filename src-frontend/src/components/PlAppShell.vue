@@ -17,7 +17,7 @@
           class="pl-app-shell__health-dot"
           :class="{ 'pl-app-shell__health-dot--connected': connected }"
         />
-        <span class="pl-app-shell__health-text">{{ connected ? '已连接' : '已断开' }}</span>
+        <span class="pl-app-shell__health-text">{{ connected ? '后端已连接' : '后端已断开' }}</span>
       </div>
       <div class="pl-app-shell__footer-center">
         <span class="pl-app-shell__author">ChHsiching</span>
@@ -139,6 +139,7 @@ startHealth();
 .pl-app-shell__footer-center {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
 }
 

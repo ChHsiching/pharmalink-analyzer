@@ -44,15 +44,7 @@
       </div>
     </PlCard>
 
-    <PlEmptyState
-      v-if="!selectedExprId && !expressionOptions.length"
-      title="未生成表达式"
-      description="请先在「表达式推导」页面生成表达式后再进行配比寻优"
-      action="前往表达式推导"
-      @action="goToExpression"
-    />
-
-    <template v-else-if="selectedExprId">
+    <template v-if="selectedExprId">
       <PlSpinner v-if="loading" size="md" />
 
       <PlToast v-if="error" :message="error" variant="error" />
@@ -64,7 +56,7 @@
       <template v-if="result">
         <!-- 2-col grid: Radar chart + Candidates table -->
         <div class="formulation__grid">
-          <PlCard variant="base" padding="md">
+          <PlCard variant="base" padding="md" class="formulation__radar-card">
             <h3 class="card-title">候选配比对比</h3>
             <v-chart
               class="chart"
@@ -74,7 +66,7 @@
             />
           </PlCard>
 
-          <PlCard variant="base" padding="md">
+          <PlCard variant="base" padding="md" class="formulation__table-card">
             <div class="card-header">
               <h3 class="card-title">候选配比</h3>
               <PlButton variant="secondary" @click="exportCsv">
@@ -158,7 +150,6 @@ import PlButton from "@/components/PlButton.vue";
 import PlInput from "@/components/PlInput.vue";
 import PlSelect from "@/components/PlSelect.vue";
 import PlCard from "@/components/PlCard.vue";
-import PlEmptyState from "@/components/PlEmptyState.vue";
 import PlSpinner from "@/components/PlSpinner.vue";
 import PlToast from "@/components/PlToast.vue";
 import PlPageHeader from "@/components/PlPageHeader.vue";
@@ -224,10 +215,6 @@ async function handleCheckpointChange(cpId: string) {
 function handleExpressionChange(exprId: string) {
   selectedExprId.value = exprId;
   markCurrentExpression(exprId);
-}
-
-function goToExpression() {
-  router.push("/expression");
 }
 
 async function runFormulation() {
@@ -341,17 +328,27 @@ onMounted(async () => {
   color: var(--color-charcoal);
 }
 
-/* -- 2-col grid: Radar + Candidates table -- */
+/* -- 2-col layout: Radar + Candidates table -- */
 .formulation__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: var(--space-6);
 }
 
 @media (max-width: 960px) {
   .formulation__grid {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
+}
+
+.formulation__radar-card {
+  min-width: 280px;
+  max-width: 320px;
+  flex-shrink: 0;
+}
+
+.formulation__table-card {
+  flex: 1;
+  min-width: 0;
 }
 
 /* -- Card title -- */

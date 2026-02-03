@@ -13,6 +13,11 @@ from app.models.expression import (
 
 
 class MockExpressionService:
+    def list_by_model(self, model_id: str):
+        if model_id == "model1":
+            return [{"expr_id": "expr_test1", "latex": "x_{0} + x_{1}"}]
+        return []
+
     def start_generate(self, model_id, top_k=10, preset="standard"):
         from app.models.expression import TaskStatusResponse
         return TaskStatusResponse(task_id="task_test1", status="pending")
@@ -360,3 +365,23 @@ async def test_generate_response_includes_target_name(mock_service):
     assert data["status"] == "completed"
     assert "target_name" in data["result"]
     assert isinstance(data["result"]["target_name"], str)
+
+
+@pytest.mark.asyncio
+async def test_list_expressions_by_checkpoint(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions", params={"checkpoint_id": "model1"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) == 1
+    assert data[0]["expr_id"] == "expr_test1"
+    assert data[0]["latex"] == "x_{0} + x_{1}"
+
+
+@pytest.mark.asyncio
+async def test_list_expressions_empty_for_unknown_checkpoint(mock_service):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/expressions", params={"checkpoint_id": "unknown"})
+    assert resp.status_code == 200
+    assert resp.json() == []

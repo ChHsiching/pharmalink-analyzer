@@ -73,7 +73,28 @@ def sample_candidates(
 
 
 def evaluate_candidates(expr: sympy.Basic, feature_names: list[str], X: np.ndarray) -> np.ndarray:
-    symbols = [sympy.Symbol(name) for name in feature_names]
+    all_syms = sorted(expr.free_symbols, key=lambda s: s.name)
+    base_set = set(feature_names)
+
+    # Augment samples with interaction term columns for symbols like X_mul_Y
+    extra_cols = []
+    extra_names = []
+    for sym in all_syms:
+        if sym.name not in base_set and "_mul_" in sym.name:
+            parts = sym.name.split("_mul_")
+            if len(parts) == 2 and parts[0] in base_set and parts[1] in base_set:
+                i = feature_names.index(parts[0])
+                j = feature_names.index(parts[1])
+                extra_cols.append(X[:, i] * X[:, j])
+                extra_names.append(sym.name)
+
+    if extra_cols:
+        X = np.hstack([X, np.column_stack(extra_cols)])
+        all_names = feature_names + extra_names
+        symbols = [sympy.Symbol(n) for n in all_names]
+    else:
+        symbols = [sympy.Symbol(name) for name in feature_names]
+
     func = sympy.lambdify(symbols, expr, modules=["numpy"])
     return func(*X.T)
 

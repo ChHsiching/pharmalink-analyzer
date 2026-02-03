@@ -181,3 +181,7 @@ class ExpressionStateManager:
         """Return (history_entries, current_index). Raises ExpressionNotFoundError."""
         state = self.get(expr_id)
         return state.history, state.history_index
+
+    def list_by_model(self, model_id: str) -> list[ExpressionState]:
+        """Return all expression states matching the given model_id."""
+        return [s for s in self._states.values() if s.model_id == model_id]

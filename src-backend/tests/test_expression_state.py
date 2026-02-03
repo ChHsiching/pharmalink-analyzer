@@ -304,3 +304,70 @@ class TestStateManagerListByModel:
         mgr = ExpressionStateManager()
         result = mgr.list_by_model("any")
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Training data storage + serialization
+# ---------------------------------------------------------------------------
+
+
+class TestTrainingDataStorage:
+    def test_state_stores_training_data(self):
+        state = ExpressionState(
+            expr_id="expr_test",
+            model_id="model_test",
+            current_sympy=sympy.Symbol("A"),
+            current_latex="A",
+            current_complexity=1,
+            current_r2=0.95,
+            X_train=[[1.0, 2.0], [3.0, 4.0]],
+            X_test=[[5.0, 6.0]],
+            y_train=[1.0, 2.0],
+            y_test=[3.0],
+            aug_names=["A", "B"],
+            X_raw=[[1.0, 2.0]],
+            pairs_raw=[{"source": "A", "target": "B"}],
+            attention_matrix=[[0.5, 0.5], [0.5, 0.5]],
+            feature_names=["A", "B"],
+        )
+        assert state.X_train == [[1.0, 2.0], [3.0, 4.0]]
+        assert state.aug_names == ["A", "B"]
+
+    def test_state_from_dict_backward_compatible(self):
+        old_data = {
+            "expr_id": "expr_old",
+            "model_id": "model_old",
+            "current_sympy": "A",
+            "current_latex": "A",
+            "current_complexity": 1,
+            "current_r2": 0.9,
+        }
+        state = ExpressionState.from_dict(old_data)
+        assert state.expr_id == "expr_old"
+        assert state.X_train == []
+        assert state.aug_names == []
+        assert state.feature_names == []
+
+    def test_state_round_trip_with_training_data(self):
+        original = ExpressionState(
+            expr_id="expr_rt",
+            model_id="model_rt",
+            current_sympy=sympy.Symbol("A"),
+            current_latex="A",
+            current_complexity=1,
+            current_r2=0.95,
+            X_train=[[1.0, 2.0]],
+            X_test=[[3.0, 4.0]],
+            y_train=[1.0],
+            y_test=[2.0],
+            aug_names=["A", "B"],
+            X_raw=[[5.0, 6.0]],
+            pairs_raw=[{"source": "A", "target": "B"}],
+            attention_matrix=[[0.5, 0.5]],
+            feature_names=["A"],
+        )
+        data = original.to_dict()
+        restored = ExpressionState.from_dict(data)
+        assert restored.X_train == [[1.0, 2.0]]
+        assert restored.aug_names == ["A", "B"]
+        assert restored.pairs_raw == [{"source": "A", "target": "B"}]

@@ -38,6 +38,15 @@ class PipelineResult:
     variable_impact: dict[str, float] = field(default_factory=dict)
     indicators: dict[str, float] = field(default_factory=dict)
     target_name: str = ""
+    X_train: list[list[float]] = field(default_factory=list)
+    X_test: list[list[float]] = field(default_factory=list)
+    y_train: list[float] = field(default_factory=list)
+    y_test: list[float] = field(default_factory=list)
+    aug_names: list[str] = field(default_factory=list)
+    X_raw: list[list[float]] = field(default_factory=list)
+    pairs_raw: list[dict] = field(default_factory=list)
+    attention_matrix: list[list[float]] = field(default_factory=list)
+    feature_names: list[str] = field(default_factory=list)
 
 
 class ExpressionPipeline:
@@ -161,4 +170,13 @@ class ExpressionPipeline:
             variable_impact=variable_impact,
             indicators=indicators,
             target_name=target_name,
+            X_train=X_train.tolist(),
+            X_test=X_test.tolist(),
+            y_train=y_train.tolist(),
+            y_test=y_test.tolist(),
+            aug_names=aug_names,
+            X_raw=X.tolist(),
+            pairs_raw=pairs_raw,
+            attention_matrix=matrix.tolist(),
+            feature_names=feature_names,
         )

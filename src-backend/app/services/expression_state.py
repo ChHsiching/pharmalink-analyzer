@@ -38,6 +38,15 @@ class ExpressionState:
     target_name: str = ""
     history: list[dict] = field(default_factory=list)
     history_index: int = -1
+    X_train: list[list[float]] = field(default_factory=list)
+    X_test: list[list[float]] = field(default_factory=list)
+    y_train: list[float] = field(default_factory=list)
+    y_test: list[float] = field(default_factory=list)
+    aug_names: list[str] = field(default_factory=list)
+    X_raw: list[list[float]] = field(default_factory=list)
+    pairs_raw: list[dict] = field(default_factory=list)
+    attention_matrix: list[list[float]] = field(default_factory=list)
+    feature_names: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Serialize to a JSON-compatible dict with SymPy expressions as strings."""
@@ -60,6 +69,15 @@ class ExpressionState:
                 for h in self.history
             ],
             "history_index": self.history_index,
+            "X_train": self.X_train,
+            "X_test": self.X_test,
+            "y_train": self.y_train,
+            "y_test": self.y_test,
+            "aug_names": self.aug_names,
+            "X_raw": self.X_raw,
+            "pairs_raw": self.pairs_raw,
+            "attention_matrix": self.attention_matrix,
+            "feature_names": self.feature_names,
         }
 
     @classmethod
@@ -84,6 +102,15 @@ class ExpressionState:
                 for h in data.get("history", [])
             ],
             history_index=data.get("history_index", -1),
+            X_train=data.get("X_train", []),
+            X_test=data.get("X_test", []),
+            y_train=data.get("y_train", []),
+            y_test=data.get("y_test", []),
+            aug_names=data.get("aug_names", []),
+            X_raw=data.get("X_raw", []),
+            pairs_raw=data.get("pairs_raw", []),
+            attention_matrix=data.get("attention_matrix", []),
+            feature_names=data.get("feature_names", []),
         )
 
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.exceptions import ExpressionTaskNotFoundError
-from app.ml.expression_tree import expr_to_latex, get_complexity, simplify_expr, sympy_to_tree
+from app.ml.expression_tree import compute_indicators_from_expr, expr_to_latex, get_complexity, simplify_expr, sympy_to_tree
 from app.models.expression import (
     ExpressionHistoryEntry,
     ExpressionHistoryResponse,
@@ -72,6 +72,15 @@ class ExpressionService:
             variable_impact=result.variable_impact,
             indicators=result.indicators,
             target_name=result.target_name,
+            X_train=result.X_train,
+            X_test=result.X_test,
+            y_train=result.y_train,
+            y_test=result.y_test,
+            aug_names=result.aug_names,
+            X_raw=result.X_raw,
+            pairs_raw=result.pairs_raw,
+            attention_matrix=result.attention_matrix,
+            feature_names=result.feature_names,
         )
         self._state.push_history(state, "generate")
         self._state.put(state)
@@ -140,11 +149,33 @@ class ExpressionService:
                 logger.info("Cleaned up stale task %s", tid)
 
     def simplify(self, expr_id: str) -> ExpressionResponse:
+        import numpy as np
+
+        from app.ml.expression_impact import compute_impact
+
         state = self._state.get(expr_id)
         simplified = simplify_expr(state.current_sympy)
         state.current_sympy = simplified
         state.current_latex = expr_to_latex(simplified)
         state.current_complexity = get_complexity(simplified)
+
+        if state.X_train and state.aug_names:
+            state.indicators = compute_indicators_from_expr(
+                simplified, state.X_train, state.X_test,
+                state.y_train, state.y_test, state.aug_names,
+            )
+            state.current_r2 = state.indicators.get("test_r2", state.current_r2)
+
+        if state.X_raw and state.feature_names:
+            state.variable_impact = compute_impact(
+                sympy_expr=simplified,
+                feature_names=state.feature_names,
+                X=np.array(state.X_raw),
+                pairs_raw=state.pairs_raw,
+                attention_matrix=np.array(state.attention_matrix),
+                aug_names=state.aug_names,
+            )
+
         self._state.push_history(state, "simplify")
         return self._to_response(state)
 

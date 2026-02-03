@@ -9,6 +9,8 @@ from app.ml.expression_tree import (
     simplify_expr,
     get_complexity,
     expr_to_latex,
+    _tree_simplify,
+    compute_indicators_from_expr,
 )
 
 x0, x1, x2 = symbols("x0 x1 x2")
@@ -123,3 +125,69 @@ def test_simplify_expr_normal_no_timeout():
     expr = x0 + x0 * 0
     result = simplify_expr(expr)
     assert result == x0
+
+
+# --- _tree_simplify rules ---
+
+
+def test_tree_simplify_identity_add():
+    assert _tree_simplify(x0 + 0) == x0
+
+
+def test_tree_simplify_identity_mul():
+    assert _tree_simplify(x0 * 1) == x0
+
+
+def test_tree_simplify_identity_div():
+    assert _tree_simplify(x0 / 1) == x0
+
+
+def test_tree_simplify_identity_pow():
+    assert _tree_simplify(x0 ** 1) == x0
+
+
+def test_tree_simplify_merge_constants():
+    assert _tree_simplify(2 + 3) == sympy.Integer(5)
+
+
+def test_tree_simplify_merge_like_terms():
+    result = _tree_simplify(3 * x0 + 2 * x0)
+    assert result == 5 * x0
+
+
+def test_tree_simplify_nested():
+    result = _tree_simplify((x0 + 0) * (x1 * 1))
+    assert result == x0 * x1
+
+
+def test_tree_simplify_no_change_needed():
+    assert _tree_simplify(x0 + x1) == x0 + x1
+
+
+def test_tree_simplify_mul_by_zero():
+    assert _tree_simplify(x0 * 0) == sympy.Integer(0)
+
+
+# --- compute_indicators_from_expr ---
+
+
+def test_compute_indicators_from_expr():
+    A, B = symbols("A B")
+    expr = A + B
+    X_train = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
+    X_test = [[7.0, 8.0], [10.0, 20.0]]
+    y_train = [3.0, 7.0, 11.0]
+    y_test = [15.0, 30.0]
+    aug_names = ["A", "B"]
+
+    indicators = compute_indicators_from_expr(expr, X_train, X_test, y_train, y_test, aug_names)
+    assert "train_r2" in indicators
+    assert "test_r2" in indicators
+    assert abs(indicators["train_r2"] - 1.0) < 0.01
+    assert abs(indicators["test_r2"] - 1.0) < 0.01
+
+
+def test_compute_indicators_empty_data():
+    A = symbols("A")
+    indicators = compute_indicators_from_expr(A, [], [], [], [], ["A"])
+    assert indicators == {}

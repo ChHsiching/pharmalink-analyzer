@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -59,7 +60,7 @@ class ExpressionService:
     def generate(self, model_id: str, top_k: int = 10, preset: str = "standard") -> ExpressionResponse:
         result = self._pipeline.run(model_id, top_k, preset=preset)
 
-        expr_id = f"expr_{uuid.uuid4().hex[:8]}"
+        expr_id = f"expr_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         state = ExpressionState(
             expr_id=expr_id,
             model_id=model_id,

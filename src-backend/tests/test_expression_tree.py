@@ -253,3 +253,28 @@ def test_refit_corrects_wrong_coefficients():
     func = sympy.lambdify([A], result, modules=["numpy"])
     for row, expected in zip(X_train, y_train):
         assert abs(float(func(*row)) - expected) < 0.1
+
+
+def test_expr_to_latex_wraps_digit_features_in_mathrm():
+    """Feature names with trailing digits should render without subscripts."""
+    expr = sympy.Symbol("PB2") + sympy.Symbol("VR")
+    result = expr_to_latex(expr, feature_names=["PB2", "VR"])
+    assert "PB_{2}" not in result
+    assert r"\mathrm{PB2}" in result
+    assert "VR" in result
+
+
+def test_expr_to_latex_handles_mul_interaction():
+    """Interaction features with _mul_ should render with cdot."""
+    expr = sympy.Symbol("CGA_mul_CA") + sympy.Symbol("HYP")
+    result = expr_to_latex(expr, feature_names=["CGA_mul_CA", "HYP"])
+    assert "_mul_" not in result
+    assert r"\mathrm{CGA} \cdot \mathrm{CA}" in result
+    assert "HYP" in result
+
+
+def test_expr_to_latex_no_feature_names_passthrough():
+    """Without feature_names, return raw sympy latex."""
+    expr = sympy.Symbol("PB2") + sympy.Float(1.0)
+    result = expr_to_latex(expr)
+    assert "PB" in result

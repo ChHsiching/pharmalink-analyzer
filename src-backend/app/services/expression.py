@@ -156,7 +156,7 @@ class ExpressionService:
         state = self._state.get(expr_id)
         simplified = simplify_expr(state.current_sympy)
         state.current_sympy = simplified
-        state.current_latex = expr_to_latex(simplified)
+        state.current_latex = expr_to_latex(simplified, feature_names=state.aug_names)
         state.current_complexity = get_complexity(simplified)
 
         if state.X_train and state.aug_names:
@@ -208,7 +208,7 @@ class ExpressionService:
             return self._to_response(state)
 
         state.current_sympy = optimized
-        state.current_latex = expr_to_latex(optimized)
+        state.current_latex = expr_to_latex(optimized, feature_names=state.aug_names)
         state.current_complexity = get_complexity(optimized)
         state.current_r2 = new_r2
         state.indicators = new_indicators

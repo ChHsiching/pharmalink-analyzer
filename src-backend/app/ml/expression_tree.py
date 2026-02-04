@@ -246,6 +246,23 @@ def get_complexity(expr: Basic) -> int:
     return sympy.count_ops(expr)
 
 
-def expr_to_latex(expr: Basic) -> str:
-    """Convert a SymPy expression to its LaTeX string representation."""
-    return sympy.latex(expr)
+def expr_to_latex(expr: Basic, feature_names: list[str] | None = None) -> str:
+    """Convert a SymPy expression to its LaTeX string representation.
+
+    Post-processes feature names to prevent subscript artifacts:
+    - PB2 renders as PB2 (not PB_{2})
+    - CGA_mul_CA renders as CGA·CA (not CGA_{mul CA})
+    """
+    latex_str = sympy.latex(expr)
+    if not feature_names:
+        return latex_str
+
+    for name in sorted(feature_names, key=len, reverse=True):
+        if name.isalpha():
+            continue
+        sym_latex = sympy.latex(sympy.Symbol(name))
+        clean = name.replace("_mul_", "} \\cdot \\mathrm{")
+        if sym_latex != name and sym_latex in latex_str:
+            latex_str = latex_str.replace(sym_latex, f"\\mathrm{{{clean}}}")
+
+    return latex_str

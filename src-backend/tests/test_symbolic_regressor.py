@@ -160,26 +160,26 @@ def test_preset_config_has_three_presets():
 
 def test_quick_preset_params():
     cfg = PRESET_CONFIG["quick"]
-    assert cfg["population_size"] == 500
-    assert cfg["generations"] == 30
-    assert cfg["parsimony_coefficient"] == 0.0003
+    assert cfg["population_size"] == 2000
+    assert cfg["generations"] == 60
+    assert cfg["parsimony_coefficient"] == 0.0001
     assert cfg["init_depth"] == (2, 10)
 
 
 def test_standard_preset_params():
     cfg = PRESET_CONFIG["standard"]
-    assert cfg["population_size"] == 1000
-    assert cfg["generations"] == 50
-    assert cfg["parsimony_coefficient"] == 0.0005
-    assert cfg["init_depth"] == (2, 10)
+    assert cfg["population_size"] == 3000
+    assert cfg["generations"] == 80
+    assert cfg["parsimony_coefficient"] == 0.00005
+    assert cfg["init_depth"] == (2, 12)
 
 
 def test_thorough_preset_params():
     cfg = PRESET_CONFIG["thorough"]
-    assert cfg["population_size"] == 2000
-    assert cfg["generations"] == 80
-    assert cfg["parsimony_coefficient"] == 0.0002
-    assert cfg["init_depth"] == (2, 12)
+    assert cfg["population_size"] == 4000
+    assert cfg["generations"] == 120
+    assert cfg["parsimony_coefficient"] == 0.00003
+    assert cfg["init_depth"] == (2, 14)
 
 
 def test_preset_overrides_regressor_params():
@@ -190,9 +190,9 @@ def test_preset_overrides_regressor_params():
     with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
         run_symbolic_regression(X, y, ["a", "b"], preset="quick")
         call_kwargs = MockSR.call_args[1]
-        assert call_kwargs["population_size"] == 500
-        assert call_kwargs["generations"] == 30
-        assert call_kwargs["parsimony_coefficient"] == 0.0003
+        assert call_kwargs["population_size"] == 2000
+        assert call_kwargs["generations"] == 60
+        assert call_kwargs["parsimony_coefficient"] == 0.0001
 
 
 def test_invalid_preset_defaults_to_standard():
@@ -203,8 +203,8 @@ def test_invalid_preset_defaults_to_standard():
     with patch("gplearn.genetic.SymbolicRegressor", return_value=mock_model) as MockSR:
         run_symbolic_regression(X, y, ["a", "b"], preset="nonexistent")
         call_kwargs = MockSR.call_args[1]
-        assert call_kwargs["population_size"] == 1000
-        assert call_kwargs["generations"] == 50
+        assert call_kwargs["population_size"] == 3000
+        assert call_kwargs["generations"] == 80
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ def test_parsimony_coefficients_derived_from_preset():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"])
     actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
-    assert sorted(actual_parsimonies) == pytest.approx([0.000125, 0.0005, 0.002])
+    assert sorted(actual_parsimonies) == pytest.approx([0.0000125, 0.00005, 0.0002])
 
 
 def test_parsimony_coefficients_quick_preset():
@@ -243,7 +243,7 @@ def test_parsimony_coefficients_quick_preset():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"], preset="quick")
     actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
-    assert sorted(actual_parsimonies) == pytest.approx([0.000075, 0.0003, 0.0012])
+    assert sorted(actual_parsimonies) == pytest.approx([0.000025, 0.0001, 0.0004])
 
 
 def test_pareto_regression_returns_three_models():
@@ -276,7 +276,7 @@ def test_pareto_regression_uses_different_parsimony():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"])
     actual_parsimonies = [call[1]["parsimony_coefficient"] for call in MockSR.call_args_list]
-    assert sorted(actual_parsimonies) == pytest.approx([0.000125, 0.0005, 0.002])
+    assert sorted(actual_parsimonies) == pytest.approx([0.0000125, 0.00005, 0.0002])
 
 
 def test_pareto_regression_gplearn_missing():
@@ -315,8 +315,8 @@ def test_pareto_regression_forwards_preset():
         MockSR.side_effect = mock_models
         run_pareto_regression(X, y, ["a", "b"], preset="quick")
         call_kwargs = MockSR.call_args_list[0][1]
-        assert call_kwargs["population_size"] == 500
-        assert call_kwargs["generations"] == 30
+        assert call_kwargs["population_size"] == 2000
+        assert call_kwargs["generations"] == 60
 
 
 # ---------------------------------------------------------------------------

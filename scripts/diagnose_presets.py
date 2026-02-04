@@ -20,7 +20,7 @@ from app.ml.symbolic_regressor import (
     run_pareto_regression,
 )
 
-DATA_PATH = Path(__file__).resolve().parent / "docs" / "csv_data" / "Leaf100HDL.csv"
+DATA_PATH = Path(__file__).resolve().parent.parent / "docs" / "csv_data" / "Leaf100HDL.csv"
 
 
 def load_data():

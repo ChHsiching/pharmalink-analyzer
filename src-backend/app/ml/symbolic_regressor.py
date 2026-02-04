@@ -84,9 +84,9 @@ def _parse(tokens: list[str], pos: int, var_map: dict) -> tuple:
 
 
 PRESET_CONFIG = {
-    "quick": {"population_size": 500, "generations": 30, "parsimony_coefficient": 0.0003, "init_depth": (2, 10), "const_range": (-2.0, 2.0)},
-    "standard": {"population_size": 1000, "generations": 50, "parsimony_coefficient": 0.0005, "init_depth": (2, 10), "const_range": (-2.0, 2.0)},
-    "thorough": {"population_size": 2000, "generations": 80, "parsimony_coefficient": 0.0002, "init_depth": (2, 12), "const_range": (-2.0, 2.0)},
+    "quick": {"population_size": 2000, "generations": 60, "parsimony_coefficient": 0.0001, "init_depth": (2, 10), "const_range": (-2.0, 2.0)},
+    "standard": {"population_size": 3000, "generations": 80, "parsimony_coefficient": 0.00005, "init_depth": (2, 12), "const_range": (-2.0, 2.0)},
+    "thorough": {"population_size": 4000, "generations": 120, "parsimony_coefficient": 0.00003, "init_depth": (2, 14), "const_range": (-2.0, 2.0)},
 }
 
 

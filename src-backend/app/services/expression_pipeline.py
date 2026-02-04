@@ -17,6 +17,7 @@ from sklearn.model_selection import train_test_split
 
 from app.exceptions import DomainError, SymbolicRegressionError
 from app.ml.attention_extractor import extract_attention_weights, extract_top_pairs
+from app.ml.expression_tree import expr_to_latex
 from app.ml.symbolic_regressor import (
     extract_best_equation,
     generate_interaction_features,
@@ -104,7 +105,7 @@ class ExpressionPipeline:
                 pareto_equations.append({
                     "index": i,
                     "sympy_expr": eq["sympy_expr"],
-                    "latex": eq["latex"],
+                    "latex": expr_to_latex(eq["sympy_expr"], feature_names=aug_names),
                     "complexity": eq["complexity"],
                     "loss": eq["loss"],
                     "r2_score": r2,
@@ -162,7 +163,7 @@ class ExpressionPipeline:
 
         return PipelineResult(
             sympy_expr=best_eq["sympy_expr"],
-            latex=best_eq["latex"],
+            latex=expr_to_latex(best_eq["sympy_expr"], feature_names=aug_names),
             complexity=best_eq["complexity"],
             loss=best_eq["loss"],
             r2_score=best_eq["r2_score"],

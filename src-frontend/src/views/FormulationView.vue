@@ -180,7 +180,7 @@ const selectedCheckpoint = ref("");
 const selectedExprId = ref(state.currentExprId);
 const expressionList = ref<{ expr_id: string; latex: string }[]>([]);
 
-const topK = ref(5);
+const topK = ref(10);
 const nSamples = ref(1000);
 
 const checkpointOptions = computed(() =>

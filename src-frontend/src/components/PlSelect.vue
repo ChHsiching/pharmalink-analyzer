@@ -1,5 +1,5 @@
 <template>
-  <div class="pl-select" ref="container">
+  <div class="pl-select" ref="container" :style="{ minWidth: `${minWidth}px` }">
     <label v-if="label" class="pl-select__label">{{ label }}</label>
     <div
       class="pl-select__trigger"
@@ -51,6 +51,19 @@ const container = ref<HTMLElement>();
 const selectedLabel = computed(
   () => props.options.find((o) => o.value === props.modelValue)?.label,
 );
+
+const minWidth = computed(() => {
+  if (typeof document === "undefined") return 160;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return 160;
+  ctx.font = '14px "Notion Sans", Inter, system-ui, sans-serif';
+  const labels = props.options.map((o) => o.label);
+  if (props.placeholder) labels.push(props.placeholder);
+  const longest = labels.reduce((a, b) => (a.length > b.length ? a : b), "");
+  const textWidth = ctx.measureText(longest).width;
+  return Math.max(Math.ceil(textWidth) + 44, 160);
+});
 
 function toggle() {
   if (props.disabled) return;

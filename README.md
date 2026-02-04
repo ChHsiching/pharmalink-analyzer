@@ -10,7 +10,7 @@
 
 *A desktop application for discovering and visualizing synergistic/antagonistic relationships between traditional Chinese medicine components using transformer attention mechanisms and symbolic regression.*
 
-[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Tauri 2](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=black)](https://tauri.app)
@@ -25,11 +25,12 @@
 
 PharmaLink Analyzer is a research tool that combines **transformer attention mechanisms** with **symbolic regression** to analyze relationships between pharmaceutical components. Given a dataset of traditional Chinese medicine components, it:
 
-1. **Trains** a Feature Transformer model with multi-head attention
-2. **Extracts** attention weights to quantify component interactions
-3. **Visualizes** attention heatmaps and interaction network graphs
-4. **Generates** interpretable mathematical expressions via symbolic regression
-5. **Evaluates** model performance with K-Fold cross-validation
+1. **Imports** CSV datasets with automatic feature detection and statistical profiling
+2. **Trains** a Feature Transformer model with multi-head attention and K-Fold cross-validation
+3. **Extracts** attention weights to quantify component interactions
+4. **Derives** interpretable mathematical expressions via gplearn symbolic regression
+5. **Evaluates** model performance with per-fold metrics (R², MSE, MAE, RMSE)
+6. **Formulates** optimal component combinations based on attention-weighted analysis
 
 ### Key Features
 
@@ -37,7 +38,8 @@ PharmaLink Analyzer is a research tool that combines **transformer attention mec
 - **Model Training** — Transformer-based training with real-time WebSocket progress updates, K-Fold cross-validation, and early stopping
 - **Attention Analysis** — Heatmap visualization and synergistic/antagonistic component network graphs
 - **Model Evaluation** — K-Fold metrics (R², MSE, MAE), residual distributions, and loss curves
-- **Expression Derivation** — Symbolic regression via PySR with simplify, optimize (Pareto front navigation), and undo/redo history
+- **Expression Derivation** — Symbolic regression via gplearn with simplify, optimize (Pareto front navigation), and undo/redo history
+- **Formulation** — Optimal component combination recommendations based on attention-weighted variable impact analysis
 
 ---
 
@@ -51,7 +53,7 @@ PharmaLink Analyzer is a research tool that combines **transformer attention mec
 | **Math Rendering** | [KaTeX](https://katex.org) | LaTeX expression rendering |
 | **Backend** | [FastAPI](https://fastapi.tiangolo.com) | REST API + WebSocket |
 | **ML Core** | [PyTorch](https://pytorch.org) | Feature Transformer with attention |
-| **Symbolic Regression** | [PySR](https://astroautomata.com/PySR/) | Interpretable equation discovery |
+| **Symbolic Regression** | [gplearn](https://gplearn.readthedocs.io/) | Interpretable equation discovery |
 | **Data** | [pandas](https://pandas.pydata.org) + [scikit-learn](https://scikit-learn.org) | Data processing and evaluation |
 
 ---
@@ -60,7 +62,7 @@ PharmaLink Analyzer is a research tool that combines **transformer attention mec
 
 ### Prerequisites
 
-- **Python 3.12+** with [uv](https://docs.astral.sh/uv/)
+- **Python 3.11+** with [uv](https://docs.astral.sh/uv/)
 - **Node.js 18+** with npm
 - **Rust** (for Tauri, optional — only needed for desktop builds)
 
@@ -89,11 +91,14 @@ The application will be available at:
 ### Run Tests
 
 ```bash
-# Backend tests (167 tests)
+# Backend tests (471 tests)
 cd src-backend && uv run pytest tests/ -v --timeout=60
 
 # Frontend type check
 cd src-frontend && npx vue-tsc --noEmit
+
+# Frontend unit tests
+cd src-frontend && npx vitest run
 ```
 
 ---
@@ -112,9 +117,10 @@ pharmalink-analyzer/
 │       │   ├── useAnalysis.ts
 │       │   ├── useEvaluation.ts
 │       │   ├── useExpression.ts
+│       │   ├── useFormulation.ts  # Formulation page state
 │       │   └── useWorkflow.ts # Cross-module state coordination
 │       ├── views/             # Page-level components
-│       └── components/        # Shared UI components
+│       └── components/        # Shared UI components (PlSelect, PlButton, etc.)
 │
 ├── src-backend/               # Python FastAPI backend
 │   └── app/
@@ -125,12 +131,19 @@ pharmalink-analyzer/
 │       │   ├── analysis.py             # Attention analysis service
 │       │   ├── evaluation.py           # Model evaluation service
 │       │   ├── expression.py           # Symbolic regression service
-│       │   └── training.py             # Model training service
+│       │   ├── expression_pipeline.py  # Expression generation pipeline
+│       │   ├── expression_state.py     # Expression state management
+│       │   ├── formulation.py          # Component formulation service
+│       │   ├── training.py             # Model training service
+│       │   └── training_pipeline.py    # Training pipeline orchestration
 │       ├── ml/                # Machine learning modules
 │       │   ├── transformer.py          # Feature Transformer model
 │       │   ├── attention_extractor.py  # Attention weight extraction
 │       │   ├── evaluator.py            # K-Fold evaluation pipeline
-│       │   └── symbolic_regressor.py   # PySR integration
+│       │   ├── expression_tree.py      # Expression tree operations
+│       │   ├── expression_impact.py    # Variable impact analysis
+│       │   ├── formulator.py           # Component formulation ML
+│       │   └── symbolic_regressor.py   # gplearn integration
 │       ├── models/            # Pydantic request/response models
 │       ├── dependencies.py    # FastAPI dependency injection factories
 │       └── exceptions.py      # Domain exception hierarchy
@@ -147,12 +160,14 @@ pharmalink-analyzer/
 |--------|----------|-------------|
 | **Datasets** | | |
 | GET | `/api/v1/datasets` | List available datasets |
-| POST | `/api/v1/datasets/upload` | Upload CSV dataset |
+| POST | `/api/v1/datasets` | Upload CSV dataset |
+| GET | `/api/v1/datasets/{dataset_id}` | Get dataset detail |
+| GET | `/api/v1/datasets/{dataset_id}/stats` | Dataset statistics |
+| DELETE | `/api/v1/datasets/{dataset_id}` | Delete dataset |
 | **Training** | | |
 | POST | `/api/v1/models/train` | Start model training |
 | GET | `/api/v1/models/train/status` | Get training status |
 | POST | `/api/v1/models/train/stop` | Stop training |
-| WS | `/ws/train` | Real-time training progress |
 | GET | `/api/v1/models/checkpoints` | List saved checkpoints |
 | **Analysis** | | |
 | GET | `/api/v1/analysis/attention/{model_id}` | Get attention matrix |
@@ -165,11 +180,14 @@ pharmalink-analyzer/
 | GET | `/api/v1/evaluation/loss-curve/{model_id}` | Training loss curves |
 | **Expression** | | |
 | POST | `/api/v1/expressions/generate/{model_id}` | Generate expression |
+| GET | `/api/v1/expressions/result/{task_id}` | Get generation result |
 | POST | `/api/v1/expressions/simplify/{expr_id}` | Simplify expression |
 | POST | `/api/v1/expressions/optimize/{expr_id}` | Navigate Pareto front |
 | GET | `/api/v1/expressions/tree/{expr_id}` | Get expression tree |
 | GET | `/api/v1/expressions/history/{expr_id}` | Operation history |
 | POST | `/api/v1/expressions/undo/{expr_id}` | Undo operation |
+| **Formulation** | | |
+| POST | `/api/v1/formulation` | Generate formulation |
 
 ---
 

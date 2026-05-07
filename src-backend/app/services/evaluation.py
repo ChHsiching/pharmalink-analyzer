@@ -90,6 +90,3 @@ class EvaluationService:
             ))
         folds = [FoldLossCurve(fold=k, points=v) for k, v in sorted(folds_dict.items())]
         return LossCurveResponse(model_id=model_id, folds=folds)
-
-
-evaluation_service = EvaluationService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))

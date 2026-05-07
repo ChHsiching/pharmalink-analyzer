@@ -217,6 +217,3 @@ class TrainingService:
             asyncio.run_coroutine_threadsafe(
                 self._progress_queue.put(msg), self._loop
             )
-
-
-training_service = TrainingService()

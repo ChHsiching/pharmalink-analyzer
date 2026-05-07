@@ -19,7 +19,7 @@ from app.exceptions import (
     UndoLimitError,
 )
 from app.services.data_loader import data_loader
-from app.services.training import training_service
+from app.dependencies import get_training_service
 
 
 @asynccontextmanager
@@ -69,6 +69,7 @@ app.include_router(expression_router, prefix=API_PREFIX)
 
 @app.websocket("/ws/train")
 async def training_websocket(websocket: WebSocket):
+    training_service = get_training_service()
     await websocket.accept()
     queue = asyncio.Queue()
     training_service.set_progress_queue(queue)

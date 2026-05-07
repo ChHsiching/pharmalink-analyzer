@@ -1,4 +1,3 @@
-# src-backend/tests/test_analysis_api.py
 import numpy as np
 import pytest
 import pytest_asyncio
@@ -6,7 +5,8 @@ import torch
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.services import analysis as analysis_module
+from app.dependencies import get_analysis_service
+from app.services.analysis import AnalysisService
 from app.services.checkpoint_resolver import CheckpointResolver
 from app.services.data_loader import DataLoader
 
@@ -40,10 +40,12 @@ def analysis_env(tmp_path, make_checkpoint):
         dataset_id=meta.id,
     )
 
-    analysis_module.analysis_service = analysis_module.AnalysisService(
+    test_service = AnalysisService(
         resolver=CheckpointResolver(tmp_path / "checkpoints", dl),
     )
-    return {"checkpoint_id": env["cp_dir"].name, "feature_count": env["n_features"]}
+    app.dependency_overrides[get_analysis_service] = lambda: test_service
+    yield {"checkpoint_id": env["cp_dir"].name, "feature_count": env["n_features"]}
+    del app.dependency_overrides[get_analysis_service]
 
 
 @pytest.mark.asyncio

@@ -167,6 +167,3 @@ class ExpressionService:
         state.current_complexity = h["complexity"]
         state.current_r2 = h["r2"]
         return self._to_response(state)
-
-
-expression_service = ExpressionService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))

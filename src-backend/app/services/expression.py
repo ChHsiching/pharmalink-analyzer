@@ -70,7 +70,7 @@ class ExpressionService:
         cp_dir, config = self._resolver.resolve(model_id)
         X, y, feature_names = self._resolver.get_features_with_target(config.dataset_id)
 
-        matrix = extract_attention_weights(cp_dir, X)
+        matrix = extract_attention_weights(cp_dir, X, config)
         pairs_raw, _ = extract_top_pairs(matrix, feature_names, top_k)
         X_aug, aug_names = generate_interaction_features(X, feature_names, pairs_raw)
         model = run_symbolic_regression(X_aug, y, aug_names)

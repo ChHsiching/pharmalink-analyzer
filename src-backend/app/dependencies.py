@@ -1,0 +1,32 @@
+from fastapi import Depends
+
+from app.services.analysis import AnalysisService
+from app.services.evaluation import EvaluationService
+from app.services.expression import ExpressionService
+from app.services.training import TrainingService
+from app.services.checkpoint_resolver import CheckpointResolver
+from app.config import CHECKPOINT_DIR
+from app.services.data_loader import data_loader as _default_data_loader
+
+
+def get_checkpoint_resolver() -> CheckpointResolver:
+    return CheckpointResolver(CHECKPOINT_DIR, _default_data_loader)
+
+
+def get_analysis_service() -> AnalysisService:
+    return AnalysisService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
+
+
+def get_evaluation_service() -> EvaluationService:
+    return EvaluationService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
+
+
+def get_expression_service() -> ExpressionService:
+    return ExpressionService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
+
+
+_training_service = TrainingService()
+
+
+def get_training_service() -> TrainingService:
+    return _training_service

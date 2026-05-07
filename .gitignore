@@ -8,6 +8,7 @@ __pycache__/
 
 # Build outputs
 dist/
+src-frontend/dist/
 
 # Tauri
 src-tauri/target/
@@ -25,3 +26,6 @@ Thumbs.db
 
 # Session state
 .remember/
+
+# Custom (Modification Prohibited)
+docs/

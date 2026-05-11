@@ -58,6 +58,8 @@ def test_interaction_features_no_pairs():
 
 
 class MockPySRModel:
+    """Mock PySR model matching current PySR version (no ``pick`` column)."""
+
     def __init__(self):
         x0, x1, x2 = sympy.symbols("x0 x1 x2")
         self._exprs = [x0, x0 + x1, x0 * x1 + x2]
@@ -67,7 +69,6 @@ class MockPySRModel:
             "loss": [10.0, 3.0, 0.5],
             "equation": ["x0", "(x0 + x1)", "((x0 * x1) + x2)"],
             "score": [0.0, 1.2, 2.5],
-            "pick": [False, False, True],
         })
 
     def sympy(self, index=None):

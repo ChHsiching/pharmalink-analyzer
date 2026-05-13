@@ -227,7 +227,7 @@ onUnmounted(() => { stopPolling(); });
   padding: 20px;
   font-family: system-ui, sans-serif;
 }
-h2 { color: #2e7d32; }
+h2 { color: var(--color-ink); }
 .toolbar {
   display: flex;
   gap: 8px;
@@ -237,25 +237,25 @@ h2 { color: #2e7d32; }
 }
 .checkpoint-select {
   padding: 6px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--color-muted);
+  border-radius: var(--radius-sm);
 }
 .preset-select {
   padding: 6px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--color-muted);
+  border-radius: var(--radius-sm);
 }
 .btn-generate, .btn-action {
   padding: 6px 16px;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.btn-generate { background: #4caf50; }
-.btn-action { background: #2196f3; }
+.btn-generate { background: var(--color-primary); }
+.btn-action { background: var(--color-link-blue); }
 .btn-generate:disabled, .btn-action:disabled {
-  background: #ccc;
+  background: var(--color-muted);
   cursor: not-allowed;
 }
 .indicators-grid {
@@ -265,21 +265,21 @@ h2 { color: #2e7d32; }
   margin-bottom: 16px;
 }
 .indicator {
-  background: #e8f5e9;
+  background: var(--color-tint-mint);
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 .indicator-label {
-  color: #666;
+  color: var(--color-steel);
   font-size: 11px;
 }
 .indicator-value {
   font-weight: 600;
-  color: #2e7d32;
+  color: var(--color-ink);
 }
 .panels {
   display: flex;
@@ -287,11 +287,11 @@ h2 { color: #2e7d32; }
 }
 .panel {
   flex: 1;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
   padding: 16px;
 }
-.panel h3 { margin-top: 0; color: #333; }
+.panel h3 { margin-top: 0; color: var(--color-charcoal); }
 .katex-container {
   min-height: 80px;
   display: flex;
@@ -305,8 +305,8 @@ h2 { color: #2e7d32; }
   font-family: monospace;
   font-size: 14px;
 }
-.loading { color: #666; }
-.error { color: #f44336; }
+.loading { color: var(--color-steel); }
+.error { color: var(--color-error); }
 .impact-panel { margin-top: 20px; }
 .impact-chart { height: 240px; width: 100%; }
 </style>

@@ -195,26 +195,26 @@ const lossCurveOption = computed(() => {
 
 .toolbar button {
   padding: 6px 16px;
-  background: #4caf50;
+  background: var(--color-primary);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .toolbar button:disabled {
-  background: #ccc;
+  background: var(--color-muted);
   cursor: not-allowed;
 }
 
-.error { color: #f44336; }
+.error { color: var(--color-error); }
 
 .metrics-bar {
   display: flex;
   gap: 24px;
   padding: 12px;
-  background: #f5f5f5;
-  border-radius: 4px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
   margin-bottom: 16px;
   font-size: 14px;
 }
@@ -226,15 +226,15 @@ const lossCurveOption = computed(() => {
 }
 
 .chart-panel {
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
   padding: 12px;
 }
 
 .chart-panel h3 {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: #333;
+  color: var(--color-charcoal);
 }
 
 .metrics-table {
@@ -245,17 +245,17 @@ const lossCurveOption = computed(() => {
 
 .metrics-table th,
 .metrics-table td {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-hairline);
   padding: 6px 10px;
   text-align: center;
 }
 
 .metrics-table th {
-  background: #f5f5f5;
+  background: var(--color-surface);
 }
 
 .metrics-table tfoot td {
   font-weight: bold;
-  background: #f9f9f9;
+  background: var(--color-surface-soft);
 }
 </style>

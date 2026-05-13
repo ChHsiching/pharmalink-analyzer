@@ -182,36 +182,36 @@ const radarOption = computed(() => {
 }
 
 h2 {
-  color: #2e7d32;
+  color: var(--color-ink);
 }
 
 .expr-info {
   padding: 8px 12px;
-  background: #e3f2fd;
-  border-radius: 4px;
+  background: var(--color-tint-sky);
+  border-radius: var(--radius-sm);
   margin-bottom: 12px;
   font-size: 14px;
-  color: #1565c0;
+  color: var(--color-link-blue);
 }
 .expr-info code {
-  background: #bbdefb;
+  background: var(--color-tint-sky);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   font-family: monospace;
 }
 
 h3 {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: #333;
+  color: var(--color-charcoal);
 }
 
 .empty-hint {
   padding: 40px;
   text-align: center;
-  color: #666;
-  background: #f5f5f5;
-  border-radius: 4px;
+  color: var(--color-steel);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
 }
 
 .toolbar {
@@ -232,8 +232,8 @@ h3 {
 .input {
   width: 90px;
   padding: 6px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--color-muted);
+  border-radius: var(--radius-sm);
 }
 
 .btn-primary,
@@ -241,35 +241,35 @@ h3 {
   padding: 6px 16px;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .btn-primary {
-  background: #4caf50;
+  background: var(--color-primary);
 }
 
 .btn-secondary {
-  background: #2196f3;
+  background: var(--color-link-blue);
 }
 
 .btn-primary:disabled {
-  background: #ccc;
+  background: var(--color-muted);
   cursor: not-allowed;
 }
 
 .status {
-  color: #666;
+  color: var(--color-steel);
 }
 
 .error {
-  color: #f44336;
+  color: var(--color-error);
 }
 
 .section {
   margin-bottom: 20px;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
   padding: 12px;
 }
 
@@ -281,17 +281,17 @@ h3 {
 
 .result-table th,
 .result-table td {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-hairline);
   padding: 6px 10px;
   text-align: center;
 }
 
 .result-table th {
-  background: #f5f5f5;
+  background: var(--color-surface);
 }
 
 .result-table tr.highlight {
-  background: #e8f5e9;
+  background: var(--color-tint-mint);
   font-weight: bold;
 }
 </style>

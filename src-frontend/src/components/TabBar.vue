@@ -35,8 +35,8 @@ function isActive(tab: TabName): boolean {
 .tab-bar {
   display: flex;
   height: 48px;
-  background: #fff;
-  border-bottom: 2px solid #e0e0e0;
+  background: var(--color-canvas);
+  border-bottom: 2px solid var(--color-hairline);
   font-family: system-ui, sans-serif;
 }
 
@@ -46,7 +46,7 @@ function isActive(tab: TabName): boolean {
   gap: 6px;
   padding: 0 20px;
   text-decoration: none;
-  color: #666;
+  color: var(--color-steel);
   font-size: 14px;
   cursor: pointer;
   border-bottom: 3px solid transparent;
@@ -55,18 +55,18 @@ function isActive(tab: TabName): boolean {
 }
 
 .tab:hover:not(.disabled) {
-  color: #2e7d32;
-  background: #f1f8e9;
+  color: var(--color-ink);
+  background: var(--color-tint-mint);
 }
 
 .tab.active {
-  color: #2e7d32;
+  color: var(--color-ink);
   font-weight: 600;
-  border-bottom-color: #4caf50;
+  border-bottom-color: var(--color-primary);
 }
 
 .tab.disabled {
-  color: #bbb;
+  color: var(--color-muted);
   cursor: not-allowed;
 }
 
@@ -77,19 +77,19 @@ function isActive(tab: TabName): boolean {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #e0e0e0;
-  color: #666;
+  background: var(--color-hairline);
+  color: var(--color-steel);
   font-size: 12px;
   font-weight: 600;
 }
 
 .tab.active .step {
-  background: #4caf50;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 .tab.disabled .step {
-  background: #eee;
-  color: #ccc;
+  background: var(--color-hairline-soft);
+  color: var(--color-muted);
 }
 </style>

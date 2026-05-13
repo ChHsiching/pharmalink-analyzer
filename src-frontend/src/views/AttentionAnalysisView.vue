@@ -288,7 +288,7 @@ onUnmounted(() => {
 }
 
 h2 {
-  color: #2e7d32;
+  color: var(--color-ink);
   text-align: center;
 }
 
@@ -302,22 +302,22 @@ h2 {
 
 .checkpoint-select {
   padding: 6px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--color-muted);
+  border-radius: var(--radius-sm);
   min-width: 250px;
 }
 
 .btn-analyze {
   padding: 6px 20px;
-  background: #4caf50;
+  background: var(--color-primary);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .btn-analyze:disabled {
-  background: #ccc;
+  background: var(--color-muted);
   cursor: not-allowed;
 }
 
@@ -335,14 +335,14 @@ h2 {
 }
 
 .panel {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
   padding: 16px;
 }
 
 .panel h3 {
   margin: 0 0 12px 0;
-  color: #333;
+  color: var(--color-charcoal);
   font-size: 16px;
 }
 
@@ -370,7 +370,7 @@ h2 {
   display: inline-block;
   width: 12px;
   height: 3px;
-  background: #4caf50;
+  background: var(--color-success);
 }
 
 .legend-item.antagonistic::before {
@@ -378,17 +378,17 @@ h2 {
   display: inline-block;
   width: 12px;
   height: 3px;
-  background: #f44336;
+  background: var(--color-error);
 }
 
 .loading,
 .error {
   text-align: center;
   padding: 40px;
-  color: #666;
+  color: var(--color-steel);
 }
 
 .error {
-  color: #f44336;
+  color: var(--color-error);
 }
 </style>

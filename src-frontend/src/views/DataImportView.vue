@@ -226,32 +226,32 @@ onMounted(fetchData);
 }
 
 .sidebar {
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--color-hairline);
   padding: 16px;
   overflow-y: auto;
-  background: #fafafa;
+  background: var(--color-surface-soft);
 }
 
 .sidebar h2 {
   margin: 0 0 12px;
   font-size: 16px;
-  color: #2e7d32;
+  color: var(--color-ink);
 }
 
 .upload-btn {
   width: 100%;
   padding: 8px;
-  background: #4caf50;
+  background: var(--color-primary);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   margin-bottom: 12px;
   font-size: 14px;
 }
 
 .upload-btn:hover {
-  background: #388e3c;
+  background: var(--color-primary-pressed);
 }
 
 .dataset-list {
@@ -262,7 +262,7 @@ onMounted(fetchData);
 
 .dataset-list li {
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   flex-wrap: wrap;
@@ -272,11 +272,11 @@ onMounted(fetchData);
 }
 
 .dataset-list li:hover {
-  background: #e8f5e9;
+  background: var(--color-tint-mint);
 }
 
 .dataset-list li.active {
-  background: #c8e6c9;
+  background: var(--color-tint-mint);
 }
 
 .ds-name {
@@ -286,13 +286,13 @@ onMounted(fetchData);
 
 .ds-meta {
   font-size: 12px;
-  color: #666;
+  color: var(--color-steel);
 }
 
 .delete-btn {
   background: none;
   border: none;
-  color: #f44336;
+  color: var(--color-error);
   cursor: pointer;
   font-size: 16px;
   padding: 0 4px;
@@ -313,24 +313,24 @@ onMounted(fetchData);
 
 .tag {
   padding: 4px 10px;
-  background: #e8f5e9;
-  border-radius: 12px;
+  background: var(--color-tint-mint);
+  border-radius: var(--radius-lg);
   font-size: 13px;
-  color: #333;
+  color: var(--color-charcoal);
 }
 
 .tag.highlight {
-  background: #fff3e0;
-  color: #e65100;
+  background: var(--color-tint-peach);
+  color: var(--color-warning);
 }
 
 .tag.custom {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: var(--color-tint-sky);
+  color: var(--color-link-blue);
 }
 
 h3 {
-  color: #2e7d32;
+  color: var(--color-success);
   margin: 16px 0 8px;
   font-size: 15px;
 }
@@ -349,31 +349,31 @@ table {
 th,
 td {
   padding: 6px 10px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-hairline);
   text-align: right;
   white-space: nowrap;
 }
 
 th {
-  background: #f5f5f5;
+  background: var(--color-surface);
   font-weight: 500;
   text-align: center;
 }
 
 th.target,
 td.target {
-  background: #fff3e0;
+  background: var(--color-tint-peach);
   font-weight: 600;
 }
 
 .status {
-  color: #666;
+  color: var(--color-steel);
   font-size: 13px;
   margin-top: 8px;
 }
 
 .status.error {
-  color: #f44336;
+  color: var(--color-error);
 }
 
 .empty {
@@ -381,14 +381,14 @@ td.target {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #999;
+  color: var(--color-stone);
 }
 
 .target-select {
   background: transparent;
-  border: 1px solid #e65100;
-  border-radius: 4px;
-  color: #e65100;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  color: var(--color-warning);
   font-size: 13px;
   padding: 0 4px;
   margin-left: 4px;
@@ -396,7 +396,7 @@ td.target {
 }
 
 .target-select:focus {
-  outline: 2px solid #e65100;
+  outline: 2px solid var(--color-warning);
   outline-offset: 1px;
 }
 </style>

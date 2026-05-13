@@ -258,27 +258,27 @@ onUnmounted(() => {
 
   .config-panel {
     border-right: none;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--color-hairline);
   }
 }
 
 .config-panel {
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--color-hairline);
   padding: 16px;
   overflow-y: auto;
-  background: #fafafa;
+  background: var(--color-surface-soft);
 }
 
 .config-panel h2 {
   margin: 0 0 16px;
   font-size: 16px;
-  color: #2e7d32;
+  color: var(--color-ink);
 }
 
 .section-title {
   font-weight: 500;
   margin: 12px 0 8px;
-  color: #333;
+  color: var(--color-charcoal);
 }
 
 .form-row {
@@ -296,14 +296,14 @@ onUnmounted(() => {
 
 .form-group label {
   font-size: 12px;
-  color: #666;
+  color: var(--color-steel);
 }
 
 .form-group input[type="number"],
 .form-group select {
   padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
   font-size: 13px;
 }
 
@@ -316,41 +316,41 @@ onUnmounted(() => {
 .btn {
   padding: 8px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
 }
 
 .btn.start {
-  background: #4caf50;
+  background: var(--color-primary);
   color: white;
   flex: 1;
 }
 
 .btn.start:disabled {
-  background: #a5d6a7;
+  background: var(--color-tint-mint);
   cursor: not-allowed;
 }
 
 .btn.stop {
-  background: #f44336;
+  background: var(--color-error);
   color: white;
 }
 
 .btn.stop:disabled {
-  background: #ef9a9a;
+  background: var(--color-tint-rose);
   cursor: not-allowed;
 }
 
 .btn.small {
   padding: 2px 8px;
   font-size: 12px;
-  background: #4caf50;
+  background: var(--color-primary);
   color: white;
 }
 
 .error {
-  color: #f44336;
+  color: var(--color-error);
   font-size: 13px;
   margin-top: 8px;
 }
@@ -363,7 +363,7 @@ onUnmounted(() => {
 .progress-panel h2 {
   margin: 0 0 12px;
   font-size: 16px;
-  color: #2e7d32;
+  color: var(--color-success);
 }
 
 .status-bar {
@@ -376,15 +376,15 @@ onUnmounted(() => {
 
 .status-badge {
   padding: 2px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   font-weight: 500;
 }
 
-.status-badge.idle { background: #e0e0e0; }
-.status-badge.running { background: #fff3e0; color: #e65100; }
-.status-badge.completed { background: #e8f5e9; color: #2e7d32; }
-.status-badge.stopped { background: #fce4ec; color: #c62828; }
-.status-badge.error { background: #ffebee; color: #b71c1c; }
+.status-badge.idle { background: var(--color-hairline); }
+.status-badge.running { background: var(--color-tint-peach); color: var(--color-warning); }
+.status-badge.completed { background: var(--color-tint-mint); color: var(--color-success); }
+.status-badge.stopped { background: var(--color-tint-rose); color: var(--color-error); }
+.status-badge.error { background: var(--color-tint-rose); color: var(--color-error); }
 
 .chart-container {
   margin-bottom: 16px;
@@ -396,14 +396,14 @@ onUnmounted(() => {
 }
 
 .empty {
-  color: #999;
+  color: var(--color-stone);
   text-align: center;
   padding: 40px;
 }
 
 .checkpoints h3 {
   font-size: 14px;
-  color: #2e7d32;
+  color: var(--color-ink);
   margin: 12px 0 8px;
 }
 
@@ -417,11 +417,11 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--color-hairline-soft);
   font-size: 13px;
 }
 
 .checkpoints .loss {
-  color: #666;
+  color: var(--color-steel);
 }
 </style>

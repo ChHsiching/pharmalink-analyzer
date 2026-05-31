@@ -129,3 +129,64 @@ async def test_delete_preset_forbidden(client):
 async def test_delete_not_found(client):
     response = await client.delete("/api/v1/datasets/nonexistent")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_target_success(client):
+    upload_resp = await client.post(
+        "/api/v1/datasets",
+        files={"file": ("custom.csv", b"QA,CGA,CA,TC\n1.0,2.0,3.0,10.0\n4.0,5.0,6.0,20.0\n", "text/csv")},
+    )
+    dataset_id = upload_resp.json()["id"]
+
+    response = await client.patch(
+        f"/api/v1/datasets/{dataset_id}/target",
+        json={"target_column": "CGA"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["target"] == "CGA"
+    assert "TC" in data["feature_names"]
+    assert "CGA" not in data["feature_names"]
+
+
+@pytest.mark.asyncio
+async def test_update_target_not_found(client):
+    response = await client.patch(
+        "/api/v1/datasets/nonexistent/target",
+        json={"target_column": "CGA"},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_target_invalid_column(client):
+    response = await client.patch(
+        "/api/v1/datasets/test-tc/target",
+        json={"target_column": "INVALID"},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_target_checkpoint_conflict(client):
+    upload_resp = await client.post(
+        "/api/v1/datasets",
+        files={"file": ("cp-ds.csv", b"QA,CGA,TC\n1.0,2.0,10.0\n3.0,4.0,20.0\n", "text/csv")},
+    )
+    dataset_id = upload_resp.json()["id"]
+
+    from unittest.mock import MagicMock
+    mock_cp = MagicMock()
+    mock_cp.dataset_id = dataset_id
+    mock_resolver = MagicMock()
+    mock_resolver.list_checkpoints.return_value = [mock_cp]
+    data_loader._checkpoint_resolver = mock_resolver
+
+    response = await client.patch(
+        f"/api/v1/datasets/{dataset_id}/target",
+        json={"target_column": "CGA"},
+    )
+    assert response.status_code == 409
+
+    data_loader._checkpoint_resolver = None

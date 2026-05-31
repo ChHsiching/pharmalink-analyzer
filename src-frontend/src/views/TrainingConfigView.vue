@@ -1,130 +1,238 @@
 <template>
   <div class="training-config">
-    <section class="config-panel">
-      <h2>训练配置</h2>
+    <PlPageHeader
+      :step="2"
+      title="模型训练"
+      subtitle="配置并训练 Transformer 模型"
+    />
 
-      <div class="form-group">
-        <label>数据集</label>
-        <select v-model="config.dataset_id">
-          <option value="">-- 选择数据集 --</option>
-          <option v-for="ds in datasets" :key="ds.id" :value="ds.id">
-            {{ ds.name }} ({{ ds.target }})
-          </option>
-        </select>
+    <div class="training-config__grid">
+      <!-- Left panel (1fr): Config -->
+      <PlCard variant="base" padding="md" class="training-config__left">
+        <h3 class="card-title">训练配置</h3>
+
+        <PlSelect
+          :model-value="config.dataset_id"
+          :options="datasetOptions"
+          label="数据集"
+          :disabled="isRunning"
+          @update:model-value="config.dataset_id = $event"
+        />
+
+        <div class="config-section">
+          <span class="config-section__label">模型结构</span>
+          <div class="config-fields">
+            <PlInput
+              :model-value="String(config.d_model)"
+              type="number"
+              label="d_model"
+              :disabled="isRunning"
+              @update:model-value="config.d_model = Number($event)"
+            />
+            <PlInput
+              :model-value="String(config.n_heads)"
+              type="number"
+              label="Heads"
+              :disabled="isRunning"
+              @update:model-value="config.n_heads = Number($event)"
+            />
+            <PlInput
+              :model-value="String(config.n_layers)"
+              type="number"
+              label="Layers"
+              :disabled="isRunning"
+              @update:model-value="config.n_layers = Number($event)"
+            />
+          </div>
+        </div>
+
+        <div class="config-section">
+          <span class="config-section__label">训练参数</span>
+          <div class="config-fields">
+            <PlInput
+              :model-value="String(config.learning_rate)"
+              type="number"
+              label="Learning Rate"
+              :disabled="isRunning"
+              @update:model-value="config.learning_rate = Number($event)"
+            />
+            <PlInput
+              :model-value="String(config.epochs)"
+              type="number"
+              label="Epochs"
+              :disabled="isRunning"
+              @update:model-value="config.epochs = Number($event)"
+            />
+            <PlInput
+              :model-value="String(config.k_folds)"
+              type="number"
+              label="K-Fold"
+              :disabled="isRunning"
+              @update:model-value="config.k_folds = Number($event)"
+            />
+          </div>
+        </div>
+
+        <div class="config-section">
+          <span class="config-section__label">正则化</span>
+          <div class="config-fields">
+            <PlInput
+              :model-value="String(config.dropout)"
+              type="number"
+              label="Dropout"
+              :disabled="isRunning"
+              @update:model-value="config.dropout = Number($event)"
+            />
+            <PlInput
+              :model-value="String(config.weight_decay)"
+              type="number"
+              label="Weight Decay"
+              :disabled="isRunning"
+              @update:model-value="config.weight_decay = Number($event)"
+            />
+            <PlInput
+              :model-value="String(config.early_stopping_patience)"
+              type="number"
+              label="Early Stop"
+              :disabled="isRunning"
+              @update:model-value="config.early_stopping_patience = Number($event)"
+            />
+          </div>
+        </div>
+
+        <div class="config-section">
+          <span class="config-section__label">数据增强</span>
+          <div class="augment-row">
+            <PlButton
+              :variant="config.augmentation.enabled ? 'primary' : 'secondary'"
+              :disabled="isRunning"
+              @click="config.augmentation.enabled = !config.augmentation.enabled"
+            >
+              {{ config.augmentation.enabled ? '已启用' : '未启用' }}
+            </PlButton>
+            <PlInput
+              v-if="config.augmentation.enabled"
+              :model-value="String(config.augmentation.gaussian_noise_sigma)"
+              type="number"
+              label="噪声 sigma"
+              :disabled="isRunning"
+              @update:model-value="config.augmentation.gaussian_noise_sigma = Number($event)"
+            />
+            <PlButton
+              v-if="config.augmentation.enabled"
+              :variant="config.augmentation.bootstrap_enabled ? 'primary' : 'secondary'"
+              :disabled="isRunning"
+              @click="config.augmentation.bootstrap_enabled = !config.augmentation.bootstrap_enabled"
+            >
+              Bootstrap {{ config.augmentation.bootstrap_enabled ? '已启用' : '未启用' }}
+            </PlButton>
+          </div>
+        </div>
+
+        <div class="config-actions">
+          <PlButton
+            variant="primary"
+            :disabled="!config.dataset_id || isRunning"
+            @click="handleStart"
+          >
+            <PlIcon name="loader" size="sm" />
+            开始训练
+          </PlButton>
+          <PlButton
+            variant="ghost"
+            :disabled="!isRunning"
+            @click="handleStop"
+          >
+            停止训练
+          </PlButton>
+        </div>
+      </PlCard>
+
+      <!-- Right panel (2fr): Results -->
+      <div class="training-config__right">
+        <!-- Stats row -->
+        <div v-if="isRunning && latestMetrics" class="stat-row">
+          <PlStatCard label="当前 Loss" :value="latestMetrics.trainLoss" variant="mint" />
+          <PlStatCard label="Epoch" :value="String(latestMetrics.epoch)" variant="sky" />
+          <PlStatCard label="最佳 Loss" :value="bestLoss" variant="peach" />
+        </div>
+
+        <!-- Progress bar -->
+        <div v-if="isRunning" class="progress-bar-row">
+          <PlProgressBar
+            :value="statusData?.current_epoch || 0"
+            :max="config.epochs"
+            label="Epoch 进度"
+          />
+        </div>
+
+        <!-- Loss chart -->
+        <PlCard v-if="progress.length" variant="base" padding="md" class="chart-card">
+          <h3 class="card-title">Loss 曲线</h3>
+          <v-chart
+            class="chart"
+            :option="chartOption"
+            theme="pharmalink"
+            autoresize
+          />
+        </PlCard>
+
+        <PlEmptyState
+          v-else
+          title="等待训练开始"
+          description="配置训练参数并点击「开始训练」"
+        />
+
+        <!-- Checkpoints -->
+        <PlCard v-if="checkpoints.length" variant="base" padding="md" class="checkpoints-card">
+          <h3 class="card-title">已保存检查点</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>检查点 ID</th>
+                  <th>数据集</th>
+                  <th>最终 Loss</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="cp in checkpoints" :key="cp.id">
+                  <td class="td--id">{{ cp.id }}</td>
+                  <td>{{ cp.dataset_id }}</td>
+                  <td class="td--loss">{{ cp.final_loss.toFixed(4) }}</td>
+                  <td>
+                    <PlButton variant="primary" @click="handleLoadCheckpoint(cp.id)">
+                      加载
+                    </PlButton>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </PlCard>
       </div>
+    </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label>d_model</label>
-          <input v-model.number="config.d_model" type="number" min="8" max="256" />
-        </div>
-        <div class="form-group">
-          <label>Heads</label>
-          <input v-model.number="config.n_heads" type="number" min="1" max="16" />
-        </div>
-        <div class="form-group">
-          <label>Layers</label>
-          <input v-model.number="config.n_layers" type="number" min="1" max="8" />
-        </div>
-      </div>
+    <!-- Footer: prev/next navigation -->
+    <div class="training-config__footer">
+      <PlButton variant="secondary" @click="goPrev">
+        <PlIcon name="arrow-left" size="sm" />
+        上一步：数据导入
+      </PlButton>
+      <PlButton variant="dark" @click="goNext">
+        下一步：注意力分析
+        <PlIcon name="arrow-right" size="sm" />
+      </PlButton>
+    </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label>Learning Rate</label>
-          <input v-model.number="config.learning_rate" type="number" step="0.0001" />
-        </div>
-        <div class="form-group">
-          <label>Epochs</label>
-          <input v-model.number="config.epochs" type="number" min="1" max="1000" />
-        </div>
-        <div class="form-group">
-          <label>K-Fold</label>
-          <input v-model.number="config.k_folds" type="number" min="2" max="10" />
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label>Dropout</label>
-          <input v-model.number="config.dropout" type="number" step="0.05" min="0" max="0.5" />
-        </div>
-        <div class="form-group">
-          <label>Weight Decay</label>
-          <input v-model.number="config.weight_decay" type="number" step="0.0001" />
-        </div>
-        <div class="form-group">
-          <label>Early Stop</label>
-          <input v-model.number="config.early_stopping_patience" type="number" min="1" max="100" />
-        </div>
-      </div>
-
-      <div class="section-title">数据增强</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>
-            <input v-model="config.augmentation.enabled" type="checkbox" /> 启用
-          </label>
-        </div>
-        <div class="form-group" v-if="config.augmentation.enabled">
-          <label>噪声 sigma</label>
-          <input v-model.number="config.augmentation.gaussian_noise_sigma" type="number" step="0.01" />
-        </div>
-        <div class="form-group" v-if="config.augmentation.enabled">
-          <label>
-            <input v-model="config.augmentation.bootstrap_enabled" type="checkbox" /> Bootstrap
-          </label>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="btn start" @click="handleStart" :disabled="!config.dataset_id || isRunning">
-          开始训练
-        </button>
-        <button class="btn stop" @click="handleStop" :disabled="!isRunning">
-          停止训练
-        </button>
-      </div>
-
-      <p v-if="error" class="error">{{ error }}</p>
-    </section>
-
-    <section class="progress-panel">
-      <h2>训练进度</h2>
-
-      <div v-if="statusData" class="status-bar">
-        <span class="status-badge" :class="statusData.status">
-          {{ statusText }}
-        </span>
-        <span v-if="isRunning">
-          Fold {{ statusData.current_fold }}/{{ config.k_folds }} -
-          Epoch {{ statusData.current_epoch }}
-        </span>
-      </div>
-
-      <div v-if="progress.length" class="chart-container">
-        <v-chart class="chart" :option="chartOption" autoresize />
-      </div>
-
-      <div v-else class="empty">等待训练开始...</div>
-
-      <div v-if="checkpoints.length" class="checkpoints">
-        <h3>已保存检查点</h3>
-        <ul>
-          <li v-for="cp in checkpoints" :key="cp.id">
-            <span>{{ cp.dataset_id }}</span>
-            <span class="loss">Loss: {{ cp.final_loss.toFixed(4) }}</span>
-            <button class="btn small" @click="handleLoadCheckpoint(cp.id)">
-              加载
-            </button>
-          </li>
-        </ul>
-      </div>
-    </section>
+    <PlToast v-if="error" :message="error" variant="error" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import VChart from "vue-echarts";
 import { use } from "echarts/core";
 import { LineChart } from "echarts/charts";
@@ -140,8 +248,22 @@ import { useTraining } from "@/composables/useTraining";
 import type { DatasetMeta } from "@/types/dataset";
 import type { TrainingConfig } from "@/types/training";
 import { useWorkflow } from "@/composables/useWorkflow";
+import { CHART_PALETTE } from "@/utils/chart-palette";
+
+import PlButton from "@/components/PlButton.vue";
+import PlInput from "@/components/PlInput.vue";
+import PlSelect from "@/components/PlSelect.vue";
+import PlCard from "@/components/PlCard.vue";
+import PlStatCard from "@/components/PlStatCard.vue";
+import PlProgressBar from "@/components/PlProgressBar.vue";
+import PlEmptyState from "@/components/PlEmptyState.vue";
+import PlToast from "@/components/PlToast.vue";
+import PlPageHeader from "@/components/PlPageHeader.vue";
+import PlIcon from "@/components/PlIcon.vue";
 
 use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
+
+const router = useRouter();
 
 const { listDatasets } = useDatasets();
 const {
@@ -180,22 +302,33 @@ const config = ref<TrainingConfig>({
 });
 
 const isRunning = computed(() => statusData.value?.status === "running");
-const statusText = computed(() => {
-  const s = statusData.value?.status;
-  const map: Record<string, string> = {
-    idle: "空闲",
-    running: "训练中",
-    completed: "已完成",
-    stopped: "已停止",
-    error: "错误",
+
+const datasetOptions = computed(() => [
+  { value: "", label: "-- 选择数据集 --" },
+  ...datasets.value.map((ds) => ({ value: ds.id, label: `${ds.name} (${ds.target})` })),
+]);
+
+const latestMetrics = computed(() => {
+  if (progress.value.length === 0) return null;
+  const last = progress.value[progress.value.length - 1];
+  return {
+    trainLoss: last.train_loss.toFixed(4),
+    valLoss: last.val_loss.toFixed(4),
+    epoch: last.epoch,
   };
-  return map[s || "idle"] || s;
+});
+
+const bestLoss = computed(() => {
+  if (progress.value.length === 0) return "--";
+  const minVal = Math.min(...progress.value.map((p) => p.val_loss));
+  return minVal.toFixed(4);
 });
 
 const chartOption = computed(() => {
   const trainData = progress.value.map((p) => [p.epoch, p.train_loss]);
   const valData = progress.value.map((p) => [p.epoch, p.val_loss]);
   return {
+    color: [CHART_PALETTE[0], CHART_PALETTE[1]],
     tooltip: { trigger: "axis" },
     legend: { data: ["Train Loss", "Val Loss"] },
     grid: { left: 60, right: 20, top: 40, bottom: 30 },
@@ -207,6 +340,14 @@ const chartOption = computed(() => {
     ],
   };
 });
+
+function goPrev() {
+  router.push({ name: "data-import" });
+}
+
+function goNext() {
+  router.push({ name: "analysis" });
+}
 
 async function handleStart() {
   await startTraining(config.value);
@@ -245,138 +386,96 @@ onUnmounted(() => {
 
 <style scoped>
 .training-config {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  height: calc(100vh - 48px);
-  font-family: system-ui, sans-serif;
-}
-
-.config-panel {
-  border-right: 1px solid #e0e0e0;
-  padding: 16px;
-  overflow-y: auto;
-  background: #fafafa;
-}
-
-.config-panel h2 {
-  margin: 0 0 16px;
-  font-size: 16px;
-  color: #2e7d32;
-}
-
-.section-title {
-  font-weight: 500;
-  margin: 12px 0 8px;
-  color: #333;
-}
-
-.form-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.form-group {
-  flex: 1;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-10);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-6);
+  font-family: var(--font-family);
 }
 
-.form-group label {
-  font-size: 12px;
-  color: #666;
+/* -- Grid: 1fr config + 2fr results -- */
+.training-config__grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-6);
 }
 
-.form-group input[type="number"],
-.form-group select {
-  padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 13px;
+@media (max-width: 960px) {
+  .training-config__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-.actions {
+/* -- Left panel: Config card -- */
+.training-config__left {
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
+.card-title {
+  font-size: var(--text-h3);
+  font-weight: var(--text-h3-weight);
+  color: var(--color-charcoal);
+  margin: 0 0 var(--space-2);
 }
 
-.btn.start {
-  background: #4caf50;
-  color: white;
-  flex: 1;
-}
-
-.btn.start:disabled {
-  background: #a5d6a7;
-  cursor: not-allowed;
-}
-
-.btn.stop {
-  background: #f44336;
-  color: white;
-}
-
-.btn.stop:disabled {
-  background: #ef9a9a;
-  cursor: not-allowed;
-}
-
-.btn.small {
-  padding: 2px 8px;
-  font-size: 12px;
-  background: #4caf50;
-  color: white;
-}
-
-.error {
-  color: #f44336;
-  font-size: 13px;
-  margin-top: 8px;
-}
-
-.progress-panel {
-  padding: 16px;
-  overflow-y: auto;
-}
-
-.progress-panel h2 {
-  margin: 0 0 12px;
-  font-size: 16px;
-  color: #2e7d32;
-}
-
-.status-bar {
+.config-section {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.config-section__label {
+  font-size: var(--text-xs);
+  font-weight: var(--text-xs-weight);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-slate);
+}
+
+.config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.augment-row {
+  display: flex;
   align-items: center;
-  margin-bottom: 12px;
-  font-size: 13px;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
-.status-badge {
-  padding: 2px 10px;
-  border-radius: 10px;
-  font-weight: 500;
+.config-actions {
+  display: flex;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-hairline);
 }
 
-.status-badge.idle { background: #e0e0e0; }
-.status-badge.running { background: #fff3e0; color: #e65100; }
-.status-badge.completed { background: #e8f5e9; color: #2e7d32; }
-.status-badge.stopped { background: #fce4ec; color: #c62828; }
-.status-badge.error { background: #ffebee; color: #b71c1c; }
+/* -- Right panel: Results -- */
+.training-config__right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
 
-.chart-container {
-  margin-bottom: 16px;
+.stat-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.progress-bar-row {
+  padding: 0;
+}
+
+/* -- Chart card -- */
+.chart-card {
+  flex: 1;
+  min-height: 0;
 }
 
 .chart {
@@ -384,33 +483,51 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.empty {
-  color: #999;
-  text-align: center;
-  padding: 40px;
+/* -- Checkpoints card -- */
+.checkpoints-card {
+  min-height: 0;
 }
 
-.checkpoints h3 {
-  font-size: 14px;
-  color: #2e7d32;
-  margin: 12px 0 8px;
+.table-wrapper {
+  overflow-x: auto;
 }
 
-.checkpoints ul {
-  list-style: none;
-  padding: 0;
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--text-xs);
 }
 
-.checkpoints li {
+th,
+td {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-hairline);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  background: var(--color-surface);
+  font-weight: var(--text-sm-weight);
+  font-size: var(--text-sm);
+  color: var(--color-charcoal);
+}
+
+.td--id {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.td--loss {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}
+
+/* -- Footer: prev/next navigation -- */
+.training-config__footer {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid #eee;
-  font-size: 13px;
-}
-
-.checkpoints .loss {
-  color: #666;
+  justify-content: space-between;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-hairline);
 }
 </style>

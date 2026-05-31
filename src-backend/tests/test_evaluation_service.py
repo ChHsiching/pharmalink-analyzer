@@ -1,8 +1,11 @@
 import json
+
 import numpy as np
 import pytest
 import torch
+from unittest.mock import patch
 
+from app.ml.evaluator import evaluate_all_folds as _real_evaluate_all_folds
 from app.models.training import TrainingConfig
 from app.services.evaluation import EvaluationService
 from app.services.checkpoint_resolver import CheckpointResolver
@@ -119,3 +122,69 @@ def test_checkpoint_not_found(tmp_path):
     with pytest.raises(CheckpointNotFoundError) as exc_info:
         svc.get_metrics("nonexistent")
     assert exc_info.value.model_id == "nonexistent"
+
+
+def test_three_endpoints_share_computation(eval_service_env):
+    """Three endpoint methods sharing same model_id compute once."""
+    svc = eval_service_env["service"]
+    model_id = eval_service_env["checkpoint_id"]
+
+    with patch(
+        "app.services.evaluation.evaluate_all_folds",
+        wraps=_real_evaluate_all_folds,
+    ) as mock_eval:
+        svc.get_metrics(model_id)
+        svc.get_predictions(model_id)
+        svc.get_residuals(model_id)
+        assert mock_eval.call_count == 1
+
+
+def test_cache_expires_after_ttl(eval_service_env):
+    """Cached result recomputes after TTL expires."""
+    svc = eval_service_env["service"]
+    model_id = eval_service_env["checkpoint_id"]
+
+    # Populate cache
+    svc.get_metrics(model_id)
+
+    # Age the cache entry beyond TTL
+    ts, data = svc._cache[model_id]
+    svc._cache[model_id] = (ts - svc._CACHE_TTL - 1, data)
+
+    # Next call should recompute
+    with patch(
+        "app.services.evaluation.evaluate_all_folds",
+        wraps=_real_evaluate_all_folds,
+    ) as mock_eval:
+        svc.get_predictions(model_id)
+        assert mock_eval.call_count == 1
+
+
+def test_invalidate_clears_cache(eval_service_env):
+    """invalidate() clears cached result, next call recomputes."""
+    svc = eval_service_env["service"]
+    model_id = eval_service_env["checkpoint_id"]
+
+    # Populate cache
+    svc.get_metrics(model_id)
+    assert model_id in svc._cache
+
+    # Invalidate
+    svc.invalidate(model_id)
+    assert model_id not in svc._cache
+
+    # Next call recomputes
+    with patch(
+        "app.services.evaluation.evaluate_all_folds",
+        wraps=_real_evaluate_all_folds,
+    ) as mock_eval:
+        svc.get_predictions(model_id)
+        assert mock_eval.call_count == 1
+
+
+def test_evaluation_service_is_singleton():
+    """Dependency provider returns same instance across calls."""
+    from app.dependencies import get_evaluation_service
+    svc1 = get_evaluation_service()
+    svc2 = get_evaluation_service()
+    assert svc1 is svc2

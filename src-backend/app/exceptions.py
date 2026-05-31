@@ -23,3 +23,19 @@ class ExpressionNotFoundError(DomainError):
 class UndoLimitError(DomainError):
     def __init__(self):
         super().__init__("No more history to undo")
+
+
+class SymbolicRegressionError(DomainError):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+class ExpressionTaskNotFoundError(DomainError):
+    def __init__(self, task_id: str):
+        super().__init__(f"Task not found: {task_id}")
+        self.task_id = task_id
+
+
+class SimplifyTimeoutError(DomainError):
+    def __init__(self):
+        super().__init__("simplify_expr timed out after 10 seconds")

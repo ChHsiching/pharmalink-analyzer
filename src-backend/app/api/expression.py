@@ -10,9 +10,18 @@ router = APIRouter(prefix="/expressions", tags=["expressions"])
 async def generate_expression(
     model_id: str,
     top_k: int = Query(10, ge=1, le=100),
+    preset: str = Query("standard", pattern="^(quick|standard|thorough)$"),
     service: ExpressionService = Depends(get_expression_service),
 ):
-    return service.generate(model_id, top_k)
+    return service.start_generate(model_id, top_k, preset=preset)
+
+
+@router.get("/result/{task_id}")
+async def get_task_result(
+    task_id: str,
+    service: ExpressionService = Depends(get_expression_service),
+):
+    return service.get_task_result(task_id)
 
 
 @router.post("/simplify/{expr_id}")
@@ -54,3 +63,11 @@ async def undo_expression(
     service: ExpressionService = Depends(get_expression_service),
 ):
     return service.undo(expr_id, steps)
+
+
+@router.get("")
+async def list_expressions(
+    checkpoint_id: str = Query(...),
+    service: ExpressionService = Depends(get_expression_service),
+):
+    return service.list_by_model(checkpoint_id)

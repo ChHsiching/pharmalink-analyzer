@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class SelfAttentionBlock(nn.Module):
@@ -24,7 +23,6 @@ class SelfAttentionBlock(nn.Module):
             x, x, x, need_weights=True, average_attn_weights=False
         )
         attn_weights = attn_weights.mean(dim=1)
-        attn_weights = F.softmax(attn_weights, dim=-1)
         x = self.norm1(x + attn_out)
         x = self.norm2(x + self.ffn(x))
         return x, attn_weights

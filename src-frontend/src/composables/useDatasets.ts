@@ -34,5 +34,13 @@ export function useDatasets() {
     await apiClient.delete(`/datasets/${id}`);
   }
 
-  return { listDatasets, getDataset, getDatasetStats, uploadDataset, deleteDataset };
+  async function updateTarget(id: string, targetColumn: string): Promise<DatasetMeta> {
+    const res = await apiClient.patch<DatasetMeta>(
+      `/datasets/${id}/target`,
+      { target_column: targetColumn },
+    );
+    return res.data;
+  }
+
+  return { listDatasets, getDataset, getDatasetStats, uploadDataset, deleteDataset, updateTarget };
 }

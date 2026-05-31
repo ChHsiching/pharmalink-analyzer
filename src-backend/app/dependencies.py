@@ -17,12 +17,23 @@ def get_analysis_service() -> AnalysisService:
     return AnalysisService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
 
 
+_evaluation_service = EvaluationService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
+
+
 def get_evaluation_service() -> EvaluationService:
-    return EvaluationService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
+    return _evaluation_service
+
+
+_expression_service = ExpressionService(
+    resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader),
+    checkpoint_dir=CHECKPOINT_DIR,
+)
+
+_default_data_loader.set_checkpoint_resolver(CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
 
 
 def get_expression_service() -> ExpressionService:
-    return ExpressionService(resolver=CheckpointResolver(CHECKPOINT_DIR, _default_data_loader))
+    return _expression_service
 
 
 _training_service = TrainingService()
@@ -30,3 +41,15 @@ _training_service = TrainingService()
 
 def get_training_service() -> TrainingService:
     return _training_service
+
+
+from app.services.formulation import FormulationService
+
+_formulation_service = FormulationService(
+    state_manager=_expression_service._state,
+    resolver=_expression_service._resolver,
+)
+
+
+def get_formulation_service() -> FormulationService:
+    return _formulation_service

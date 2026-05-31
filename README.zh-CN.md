@@ -1,5 +1,7 @@
 🌐 **Language / 语言:** [English](README.md) | [中文](README.zh-CN.md)
 
+<img src="./assets/logo.png" alt="PharmaLink Analyzer Logo" width="200" />
+
 <div align="center">
 
 # PharmaLink Analyzer

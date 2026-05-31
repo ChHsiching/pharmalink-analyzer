@@ -10,6 +10,9 @@ __pycache__/
 dist/
 src-frontend/dist/
 
+# Checkpoints (model artifacts, too large for git)
+checkpoints/
+
 # Tauri
 src-tauri/target/
 
@@ -29,3 +32,7 @@ Thumbs.db
 
 # Custom (Modification Prohibited)
 docs/
+# PyInstaller build artifacts
+src-backend/build/
+src-backend/dist/
+src-tauri/binaries/

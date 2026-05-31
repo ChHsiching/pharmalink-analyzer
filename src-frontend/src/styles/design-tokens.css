@@ -1,0 +1,120 @@
+:root {
+  /* === Brand Primary (teal-green, 5 levels) === */
+  --color-primary-deep: #1a5c4c;
+  --color-primary-pressed: #2d6e5f;
+  --color-primary: #3d8b7a;
+  --color-primary-soft: #6bb5a5;
+  --color-primary-tint: #e8f5f0;
+  --color-on-primary: #ffffff;
+
+  /* === Semantic === */
+  --color-success: #1aae39;
+  --color-warning: #dd5b00;
+  --color-error: #e03131;
+
+  /* === Text === */
+  --color-ink: #1a1a1a;
+  --color-charcoal: #37352f;
+  --color-slate: #5d5b54;
+  --color-steel: #787671;
+  --color-stone: #a4a097;
+  --color-muted: #bbb8b1;
+  --color-on-dark: #ffffff;
+
+  /* === Surface === */
+  --color-canvas: #ffffff;
+  --color-surface: #f6f5f4;
+  --color-surface-soft: #fafaf9;
+  --color-hairline: #e5e3df;
+  --color-hairline-soft: #ede9e4;
+  --color-hairline-strong: #c8c4be;
+
+  /* === Links === */
+  --color-link-blue: #0075de;
+
+  /* === Card Tints === */
+  --color-tint-mint: #d9f3e1;
+  --color-tint-peach: #ffe8d4;
+  --color-tint-rose: #fde0ec;
+  --color-tint-sky: #dcecfa;
+  --color-tint-yellow: #fef7d6;
+  --color-tint-cream: #f8f5e8;
+  --color-tint-gray: #f0eeec;
+
+  /* === Typography (rem-based, root 14px) === */
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --text-hero: 2.5714rem;
+  --text-hero-weight: 700;
+  --text-hero-line: 1.15;
+  --text-h1: 2rem;
+  --text-h1-weight: 600;
+  --text-h1-line: 1.2;
+  --text-h2: 1.5714rem;
+  --text-h2-weight: 600;
+  --text-h2-line: 1.25;
+  --text-h3: 1.2857rem;
+  --text-h3-weight: 600;
+  --text-h3-line: 1.3;
+  --text-body-lg: 1.1429rem;
+  --text-body-lg-weight: 400;
+  --text-body-lg-line: 1.5;
+  --text-body: 1rem;
+  --text-body-weight: 400;
+  --text-body-line: 1.55;
+  --text-sm: 0.9286rem;
+  --text-sm-weight: 400;
+  --text-sm-line: 1.5;
+  --text-xs: 0.8571rem;
+  --text-xs-weight: 400;
+  --text-xs-line: 1.4;
+  --text-micro: 0.7857rem;
+  --text-micro-weight: 500;
+  --text-micro-line: 1.3;
+
+  /* === Spacing (4px base, rem) === */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* === Elevation (5 levels) === */
+  --shadow-flat: none;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-raised: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-dropdown: 0 10px 15px rgba(0,0,0,0.06), 0 4px 6px rgba(0,0,0,0.04);
+  --shadow-modal: 0 20px 25px rgba(0,0,0,0.08), 0 8px 10px rgba(0,0,0,0.04);
+
+  /* === Border Radius (6 levels) === */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* === Content Layout === */
+  --content-max-width: 75rem;
+  --header-height: 3.5rem;
+  --stepnav-height: 3.25rem;
+
+  /* === Legacy Aliases (for gradual migration) === */
+  --font-size-body: var(--text-body);
+  --font-size-body-md: var(--text-body-lg);
+  --font-size-heading: var(--text-h3);
+  --font-size-heading-md: var(--text-h2);
+  --font-size-caption: var(--text-xs);
+  --font-weight-body: var(--text-body-weight);
+  --font-weight-medium: 500;
+  --font-weight-heading: var(--text-h3-weight);
+  --line-height-body: var(--text-body-line);
+}
+
+html {
+  font-size: 14px;
+}

@@ -11,6 +11,11 @@ export interface ExpressionResponse {
   complexity: number;
   r2_score: number;
   tree: ExpressionNode;
+  pareto_count: number;
+  pareto_index: number;
+  variable_impact: Record<string, number>;
+  indicators: Record<string, number>;
+  target_name: string;
 }
 
 export interface ExpressionHistoryEntry {
@@ -24,4 +29,11 @@ export interface ExpressionHistoryResponse {
   expr_id: string;
   history: ExpressionHistoryEntry[];
   current_index: number;
+}
+
+export interface TaskStatusResponse {
+  task_id: string;
+  status: "pending" | "running" | "completed" | "failed";
+  result: ExpressionResponse | null;
+  error: string | null;
 }

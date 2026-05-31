@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -14,6 +16,11 @@ class ExpressionResponse(BaseModel):
     complexity: int
     r2_score: float
     tree: ExpressionNode
+    pareto_count: int = 1
+    pareto_index: int = 0
+    variable_impact: dict[str, float] = {}
+    indicators: dict[str, float] = {}
+    target_name: str = ""
 
 
 class ExpressionHistoryEntry(BaseModel):
@@ -27,3 +34,10 @@ class ExpressionHistoryResponse(BaseModel):
     expr_id: str
     history: list[ExpressionHistoryEntry]
     current_index: int
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    result: dict[str, Any] | None = None
+    error: str | None = None

@@ -1,12 +1,22 @@
+import logging
 from pathlib import Path
 
 import numpy as np
 import torch
 from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
 
-from app.ml.checkpoint_loader import load_model
+from app.exceptions import CheckpointNotFoundError, DomainError
+from app.ml.checkpoint_loader import load_fold_model, load_model, load_scaler_params
 from app.models.training import TrainingConfig
+
+logger = logging.getLogger(__name__)
+
+
+def validate_checkpoint_dir(checkpoint_dir: Path) -> None:
+    if not checkpoint_dir.is_dir():
+        raise CheckpointNotFoundError(checkpoint_dir.name)
+    if not (checkpoint_dir / "config.json").exists():
+        raise DomainError(f"Invalid checkpoint: missing config.json")
 
 
 def compute_fold_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
@@ -39,26 +49,49 @@ def evaluate_all_folds(
     n_features: int,
     config: TrainingConfig,
 ) -> list[dict]:
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X).astype(np.float32)
+    validate_checkpoint_dir(checkpoint_dir)
 
-    kfold = KFold(n_splits=config.k_folds, shuffle=True, random_state=42)
-
-    model = load_model(checkpoint_dir, n_features, config)
+    kfold = KFold(
+        n_splits=config.k_folds,
+        shuffle=config.k_fold_shuffle,
+        random_state=config.k_fold_seed,
+    )
 
     fold_results = []
     with torch.no_grad():
-        for fold_idx, (train_idx, val_idx) in enumerate(kfold.split(X_scaled)):
-            X_val = torch.tensor(X_scaled[val_idx])
-            y_val = y[val_idx]
-            predictions, _ = model(X_val)
-            preds_np = predictions.numpy()
+        for fold_idx, (train_idx, val_idx) in enumerate(kfold.split(X)):
+            try:
+                fold_model_path = checkpoint_dir / f"model_fold{fold_idx}.pt"
+                fold_scaler_path = checkpoint_dir / f"scaler_fold{fold_idx}.json"
 
-            metrics = compute_fold_metrics(y_val, preds_np)
-            metrics["fold"] = fold_idx + 1
-            metrics["predictions"] = preds_np.tolist()
-            metrics["actuals"] = y_val.tolist()
-            metrics["residuals"] = (y_val - preds_np).tolist()
-            fold_results.append(metrics)
+                if fold_model_path.exists() and fold_scaler_path.exists():
+                    mean, scale = load_scaler_params(fold_scaler_path)
+                    model = load_fold_model(checkpoint_dir, n_features, config, fold_idx)
+                else:
+                    mean, scale = load_scaler_params(checkpoint_dir / "scaler_params.json")
+                    model = load_model(checkpoint_dir, n_features, config)
+
+                safe_scale = np.where(np.abs(scale) < 1e-8, 1.0, scale)
+                X_scaled = ((X - mean) / safe_scale).astype(np.float32)
+
+                X_val = torch.tensor(X_scaled[val_idx])
+                y_val = y[val_idx]
+                predictions, _ = model(X_val)
+                preds_np = predictions.numpy()
+
+                metrics = compute_fold_metrics(y_val, preds_np)
+                metrics["fold"] = fold_idx + 1
+                metrics["predictions"] = preds_np.tolist()
+                metrics["actuals"] = y_val.tolist()
+                metrics["residuals"] = (y_val - preds_np).tolist()
+                fold_results.append(metrics)
+            except Exception as e:
+                logger.warning("Fold %d evaluation failed: %s", fold_idx + 1, e)
+                continue
+
+    if not fold_results:
+        raise DomainError(
+            f"All folds failed to evaluate for checkpoint: {checkpoint_dir}"
+        )
 
     return fold_results

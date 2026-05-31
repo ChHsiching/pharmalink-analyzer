@@ -1,119 +1,212 @@
 <template>
   <div class="data-import">
-    <aside class="sidebar">
-      <h2>数据集</h2>
-      <button class="upload-btn" @click="triggerUpload">+ 导入 CSV</button>
-      <input
-        ref="fileInput"
-        type="file"
-        accept=".csv"
-        hidden
-        @change="handleUpload"
-      />
-      <ul class="dataset-list">
-        <li
-          v-for="ds in datasets"
-          :key="ds.id"
-          :class="{ active: selectedId === ds.id }"
-          @click="selectDataset(ds.id)"
+    <PlPageHeader
+      :step="1"
+      title="数据导入"
+      subtitle="导入中药成分数据集，选择目标变量进行后续分析"
+    />
+
+    <div class="data-import__grid-top">
+      <!-- Card 1: Upload area -->
+      <PlCard variant="base" padding="lg">
+        <div
+          :class="['upload-zone', { 'upload-zone--active': isDragging }]"
+          @dragover.prevent="isDragging = true"
+          @dragleave="isDragging = false"
+          @drop.prevent="handleDrop"
         >
-          <span class="ds-name">{{ ds.name }}</span>
-          <span class="ds-meta">{{ ds.target }} · {{ ds.plant_part }}</span>
-          <button
-            v-if="!ds.is_preset"
-            class="delete-btn"
-            title="删除"
-            @click.stop="handleDelete(ds.id)"
+          <PlIcon name="upload" size="lg" />
+          <p class="upload-zone__text">将 CSV 文件拖放到此处</p>
+          <span class="upload-zone__or">或</span>
+          <PlButton variant="primary" @click="triggerUpload">选择文件</PlButton>
+          <span v-if="isDragging" class="upload-zone__hint">释放以导入</span>
+        </div>
+
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".csv"
+          hidden
+          @change="handleUpload"
+        />
+
+        <div v-if="loading" class="upload-zone__spinner">
+          <PlSpinner size="sm" />
+        </div>
+      </PlCard>
+
+      <!-- Card 2: Dataset list -->
+      <PlCard variant="base" padding="md">
+        <h3 class="card-title">数据集列表</h3>
+
+        <ul v-if="datasets.length" class="dataset-list">
+          <li
+            v-for="ds in datasets"
+            :key="ds.id"
+            :class="['dataset-list__item', { 'dataset-list__item--active': selectedId === ds.id }]"
+            @click="selectDataset(ds.id)"
           >
-            ×
-          </button>
-        </li>
-      </ul>
-      <p v-if="loading" class="status">加载中...</p>
-      <p v-if="error" class="status error">{{ error }}</p>
-    </aside>
+            <span class="dataset-list__name">{{ ds.name }}</span>
+            <div class="dataset-list__meta">
+              <PlBadge :text="ds.plant_part" variant="neutral" />
+              <PlBadge v-if="ds.is_preset" text="预置" variant="tag-orange" />
+              <PlBadge v-else text="自定义" variant="tag-green" />
+              <PlButton
+                v-if="!ds.is_preset"
+                variant="ghost"
+                icon="×"
+                @click.stop="handleDelete(ds.id)"
+              />
+            </div>
+          </li>
+        </ul>
 
-    <main class="content">
-      <template v-if="selected">
-        <div class="meta-tags">
-          <span class="tag">样本数: {{ selected.n_samples }}</span>
-          <span class="tag">特征数: {{ selected.n_features }}</span>
-          <span class="tag highlight">Target: {{ selected.target }}</span>
-          <span class="tag">部位: {{ selected.plant_part }}</span>
-          <span v-if="!selected.is_preset" class="tag custom">自定义</span>
-          <span v-else class="tag">预置</span>
+        <PlEmptyState
+          v-else
+          title="暂无数据集"
+          description="导入 CSV 文件以开始分析"
+          action="导入 CSV"
+          @action="triggerUpload"
+        />
+      </PlCard>
+    </div>
+
+    <!-- Card 3: Data preview (full-width) -->
+    <PlCard v-if="selected" variant="base" padding="md">
+      <h3 class="card-title">数据预览</h3>
+
+      <div class="preview-meta">
+        <PlBadge :text="`样本数: ${selected.n_samples}`" variant="teal" />
+        <PlBadge :text="`成分数: ${selected.n_features}`" variant="teal" />
+        <PlBadge :text="`部位: ${selected.plant_part}`" variant="teal" />
+        <PlBadge
+          v-if="!selected.is_preset"
+          text="自定义"
+          variant="tag-green"
+        />
+        <PlBadge v-else text="预置" variant="tag-orange" />
+
+        <div class="target-select">
+          <PlSelect
+            :model-value="selected.target"
+            :options="targetOptions"
+            label="药效指标"
+            @update:model-value="handleTargetChange"
+          />
         </div>
-
-        <h3>数据预览</h3>
-        <div class="table-wrapper">
-          <table v-if="selected.preview?.length">
-            <thead>
-              <tr>
-                <th
-                  v-for="col in columns"
-                  :key="col"
-                  :class="{ target: col === selected.target }"
-                >
-                  {{ col }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in selected.preview" :key="i">
-                <td v-for="col in columns" :key="col">{{ row[col] }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <h3>特征统计</h3>
-        <div v-if="stats" class="table-wrapper">
-          <table class="stats-table">
-            <thead>
-              <tr>
-                <th>特征</th>
-                <th>均值</th>
-                <th>标准差</th>
-                <th>最小值</th>
-                <th>最大值</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="s in stats.stats" :key="s.column">
-                <td :class="{ target: s.column === selected.target }">
-                  {{ s.column }}
-                </td>
-                <td>{{ s.mean.toFixed(2) }}</td>
-                <td>{{ s.std.toFixed(2) }}</td>
-                <td>{{ s.min.toFixed(2) }}</td>
-                <td>{{ s.max.toFixed(2) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
-
-      <div v-else class="empty">
-        <p>请从左侧选择一个数据集，或导入自定义 CSV 文件</p>
       </div>
-    </main>
+
+      <div class="table-wrapper">
+        <table v-if="selected.preview?.length">
+          <thead>
+            <tr>
+              <th
+                v-for="col in columns"
+                :key="col"
+                :class="{ 'th--target': col === selected.target }"
+              >
+                {{ col }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, i) in selected.preview" :key="i">
+              <td
+                v-for="col in columns"
+                :key="col"
+                :class="{ 'td--target': col === selected.target }"
+              >
+                {{ row[col] }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </PlCard>
+
+    <!-- Card 4: Feature statistics (full-width) -->
+    <PlCard v-if="stats" variant="stat" padding="md">
+      <h3 class="card-title">成分统计</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>成分</th>
+              <th>均值</th>
+              <th>标准差</th>
+              <th>最小值</th>
+              <th>最大值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in stats.stats" :key="s.column">
+              <td :class="{ 'td--target': selected && s.column === selected.target }">
+                {{ s.column }}
+              </td>
+              <td>{{ s.mean.toFixed(2) }}</td>
+              <td>{{ s.std.toFixed(2) }}</td>
+              <td>{{ s.min.toFixed(2) }}</td>
+              <td>{{ s.max.toFixed(2) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </PlCard>
+
+    <!-- Empty state when no dataset selected (shown below the top grid) -->
+    <PlCard v-if="!selected && datasets.length > 0" variant="base" padding="lg">
+      <PlEmptyState
+        title="暂未选择数据集"
+        description="从上方列表中选择一个数据集，或导入自定义 CSV 文件"
+        action="导入 CSV"
+        @action="triggerUpload"
+      />
+    </PlCard>
+
+    <!-- Footer: Next step button -->
+    <div class="data-import__footer">
+      <PlButton variant="dark" :disabled="!selected" @click="goNext">
+        下一步：模型训练
+      </PlButton>
+    </div>
+
+    <PlToast :message="error" variant="error" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import { useDatasets } from "@/composables/useDatasets";
 import { useWorkflow } from "@/composables/useWorkflow";
+import PlPageHeader from "@/components/PlPageHeader.vue";
+import PlButton from "@/components/PlButton.vue";
+import PlSelect from "@/components/PlSelect.vue";
+import PlCard from "@/components/PlCard.vue";
+import PlBadge from "@/components/PlBadge.vue";
+import PlIcon from "@/components/PlIcon.vue";
+import PlSpinner from "@/components/PlSpinner.vue";
+import PlToast from "@/components/PlToast.vue";
+import PlEmptyState from "@/components/PlEmptyState.vue";
 import type {
   DatasetMeta,
   DatasetDetail,
   DatasetStatsResponse,
 } from "@/types/dataset";
 
-const { listDatasets, getDataset, getDatasetStats, uploadDataset, deleteDataset } =
-  useDatasets();
+const router = useRouter();
 
-const { markDatasetsAvailable } = useWorkflow();
+const {
+  listDatasets,
+  getDataset,
+  getDatasetStats,
+  uploadDataset,
+  deleteDataset,
+  updateTarget,
+} = useDatasets();
+
+const { markDatasetsAvailable, markTargetSelected } = useWorkflow();
 const datasets = ref<DatasetMeta[]>([]);
 const selected = ref<DatasetDetail | null>(null);
 const stats = ref<DatasetStatsResponse | null>(null);
@@ -121,11 +214,16 @@ const selectedId = ref("");
 const loading = ref(false);
 const error = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
+const isDragging = ref(false);
 
 const columns = computed(() => {
   if (!selected.value) return [];
   return [...selected.value.feature_names, selected.value.target];
 });
+
+const targetOptions = computed(() =>
+  selected.value?.columns.map((c) => ({ value: c, label: c })) ?? [],
+);
 
 async function fetchData() {
   loading.value = true;
@@ -148,6 +246,7 @@ async function selectDataset(id: string) {
   try {
     selected.value = await getDataset(id);
     stats.value = await getDatasetStats(id);
+    markTargetSelected(!!selected.value?.target);
   } catch {
     error.value = "加载数据集失败";
   }
@@ -157,10 +256,7 @@ function triggerUpload() {
   fileInput.value?.click();
 }
 
-async function handleUpload(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
+async function processFile(file: File) {
   try {
     const meta = await uploadDataset(file);
     await fetchData();
@@ -168,7 +264,24 @@ async function handleUpload(event: Event) {
   } catch {
     error.value = "导入失败，请检查 CSV 格式";
   }
+}
+
+async function handleUpload(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await processFile(file);
   input.value = "";
+}
+
+async function handleDrop(event: DragEvent) {
+  isDragging.value = false;
+  const file = event.dataTransfer?.files[0];
+  if (!file || !file.name.endsWith(".csv")) {
+    error.value = "请拖入 CSV 文件";
+    return;
+  }
+  await processFile(file);
 }
 
 async function handleDelete(id: string) {
@@ -185,173 +298,188 @@ async function handleDelete(id: string) {
   }
 }
 
+async function handleTargetChange(newTarget: string) {
+  if (!selected.value || newTarget === selected.value.target) return;
+  try {
+    const updated = await updateTarget(selected.value.id, newTarget);
+    await selectDataset(updated.id);
+    markTargetSelected(true);
+  } catch {
+    error.value = "切换目标变量失败";
+  }
+}
+
+function goNext() {
+  router.push({ name: "training" });
+}
+
 onMounted(fetchData);
 </script>
 
 <style scoped>
 .data-import {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  font-family: var(--font-family);
+}
+
+/* ── Top grid: upload + dataset list ── */
+.data-import__grid-top {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  height: calc(100vh - 48px);
-  font-family: system-ui, sans-serif;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
 }
 
-.sidebar {
-  border-right: 1px solid #e0e0e0;
-  padding: 16px;
-  overflow-y: auto;
-  background: #fafafa;
+@media (max-width: 960px) {
+  .data-import__grid-top {
+    grid-template-columns: 1fr;
+  }
 }
 
-.sidebar h2 {
-  margin: 0 0 12px;
-  font-size: 16px;
-  color: #2e7d32;
+/* ── Upload zone ── */
+.upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  border: 2px dashed var(--color-hairline-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.upload-btn {
-  width: 100%;
-  padding: 8px;
-  background: #4caf50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-bottom: 12px;
-  font-size: 14px;
+.upload-zone--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
 }
 
-.upload-btn:hover {
-  background: #388e3c;
+.upload-zone__text {
+  font-size: var(--text-body);
+  color: var(--color-charcoal);
+  margin: 0;
 }
 
+.upload-zone__or {
+  font-size: var(--text-xs);
+  color: var(--color-stone);
+}
+
+.upload-zone__hint {
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+}
+
+.upload-zone__spinner {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+/* ── Card title ── */
+.card-title {
+  font-size: var(--text-h3);
+  font-weight: var(--text-h3-weight);
+  color: var(--color-charcoal);
+  margin: 0 0 var(--space-4);
+}
+
+/* ── Dataset list ── */
 .dataset-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
-.dataset-list li {
-  padding: 8px;
-  border-radius: 4px;
+.dataset-list__item {
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  transition: background 0.15s;
+}
+
+.dataset-list__item:hover {
+  background: var(--color-surface);
+}
+
+.dataset-list__item--active {
+  background: var(--color-primary-tint);
+  outline: 2px solid var(--color-primary);
+}
+
+.dataset-list__name {
+  font-size: var(--text-body);
+  font-weight: var(--text-body-weight);
+  color: var(--color-ink);
+}
+
+.dataset-list__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* ── Preview meta badges ── */
+.preview-meta {
+  display: flex;
+  gap: var(--space-2);
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-4);
 }
 
-.dataset-list li:hover {
-  background: #e8f5e9;
-}
-
-.dataset-list li.active {
-  background: #c8e6c9;
-}
-
-.ds-name {
-  font-weight: 500;
-  flex: 1 1 100%;
-}
-
-.ds-meta {
-  font-size: 12px;
-  color: #666;
-}
-
-.delete-btn {
-  background: none;
-  border: none;
-  color: #f44336;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 0 4px;
+.target-select {
   margin-left: auto;
 }
 
-.content {
-  padding: 20px;
-  overflow-y: auto;
-}
-
-.meta-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.tag {
-  padding: 4px 10px;
-  background: #e8f5e9;
-  border-radius: 12px;
-  font-size: 13px;
-  color: #333;
-}
-
-.tag.highlight {
-  background: #fff3e0;
-  color: #e65100;
-}
-
-.tag.custom {
-  background: #e3f2fd;
-  color: #1565c0;
-}
-
-h3 {
-  color: #2e7d32;
-  margin: 16px 0 8px;
-  font-size: 15px;
-}
-
+/* ── Tables ── */
 .table-wrapper {
   overflow-x: auto;
-  margin-bottom: 16px;
 }
 
 table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 13px;
+  font-size: var(--text-xs);
 }
 
 th,
 td {
-  padding: 6px 10px;
-  border: 1px solid #e0e0e0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-hairline);
   text-align: right;
   white-space: nowrap;
 }
 
 th {
-  background: #f5f5f5;
-  font-weight: 500;
+  background: var(--color-surface);
+  font-weight: var(--text-sm-weight);
+  font-size: var(--text-sm);
   text-align: center;
+  color: var(--color-charcoal);
 }
 
-th.target,
-td.target {
-  background: #fff3e0;
+.th--target,
+.td--target {
+  background: var(--color-tint-peach);
   font-weight: 600;
 }
 
-.status {
-  color: #666;
-  font-size: 13px;
-  margin-top: 8px;
-}
-
-.status.error {
-  color: #f44336;
-}
-
-.empty {
+/* ── Footer ── */
+.data-import__footer {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #999;
+  justify-content: flex-end;
+  padding-top: var(--space-4);
 }
 </style>

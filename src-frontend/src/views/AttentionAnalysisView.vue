@@ -1,60 +1,100 @@
 <!-- src/views/AttentionAnalysisView.vue -->
 <template>
   <div class="attention-analysis">
-    <h2>注意力分析</h2>
-    <div class="toolbar">
-      <select v-model="selectedCheckpoint" class="checkpoint-select">
-        <option value="">选择检查点</option>
-        <option
-          v-for="cp in checkpoints"
-          :key="cp.id"
-          :value="cp.id"
-        >
-          {{ cp.id }} (loss: {{ cp.final_loss.toFixed(4) }})
-        </option>
-      </select>
-      <button
-        @click="analyze"
+    <PlPageHeader
+      :step="3"
+      title="注意力分析"
+      subtitle="可视化分析 Transformer 注意力权重与成分关联"
+    />
+
+    <!-- Toolbar -->
+    <div class="attention-analysis__toolbar">
+      <PlSelect
+        :model-value="selectedCheckpoint"
+        :options="checkpointOptions"
+        label="检查点"
+        @update:model-value="selectedCheckpoint = $event"
+      />
+      <PlButton
+        variant="primary"
         :disabled="!selectedCheckpoint || loading"
-        class="btn-analyze"
+        @click="analyze"
       >
         分析
-      </button>
-      <label v-if="network" class="threshold-control">
-        阈值: {{ threshold.toFixed(2) }}
-        <input
-          type="range"
-          v-model.number="threshold"
-          min="0"
-          max="1"
-          step="0.01"
-          @change="updateNetwork"
-        />
-      </label>
+      </PlButton>
+      <PlInput
+        v-if="network"
+        :model-value="String(threshold)"
+        type="number"
+        label="阈值"
+        @update:model-value="handleThresholdChange"
+      />
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+    <!-- Status -->
+    <PlSpinner v-if="loading" size="md" />
+    <PlToast v-else-if="error" :message="error" variant="error" />
 
-    <div v-if="heatmap" class="panels">
-      <div class="panel">
-        <h3>注意力热力图</h3>
-        <v-chart :option="heatmapOption" autoresize style="height: 500px" />
-      </div>
-      <div class="panel">
-        <h3>关联网络图</h3>
+    <PlEmptyState
+      v-else-if="!heatmap && !network"
+      title="尚无分析数据"
+      description="选择一个检查点并点击分析以查看注意力热力图和关联网络图"
+    />
+
+    <!-- Visualization panels: 2-col equal grid -->
+    <div v-if="heatmap" class="attention-analysis__viz-grid">
+      <PlCard variant="base" padding="md">
+        <h3 class="card-title">注意力热力图</h3>
+        <v-chart :option="heatmapOption" theme="pharmalink" autoresize class="heatmap-chart" />
+      </PlCard>
+      <PlCard variant="base" padding="md">
+        <h3 class="card-title">关联网络图</h3>
         <div ref="networkRef" class="network-container"></div>
-        <div class="legend">
-          <span class="legend-item synergistic">协同</span>
-          <span class="legend-item antagonistic">拮抗</span>
+        <div class="network-legend">
+          <span class="network-legend__item network-legend__item--synergistic">协同</span>
+          <span class="network-legend__item network-legend__item--antagonistic">拮抗</span>
+        </div>
+      </PlCard>
+    </div>
+
+    <!-- Summary bar: Top-5 attention weights -->
+    <PlCard v-if="topAttentionWeights.length" variant="base" padding="md">
+      <h3 class="card-title">Top-5 注意力权重</h3>
+      <div class="attention-analysis__summary">
+        <div
+          v-for="(item, idx) in topAttentionWeights"
+          :key="idx"
+          class="attention-analysis__summary-row"
+        >
+          <span class="attention-analysis__summary-label">
+            {{ item.source }} &rarr; {{ item.target }}
+          </span>
+          <PlProgressBar
+            :value="item.weight"
+            :max="maxAttentionValue"
+            :label="item.weight.toFixed(4)"
+          />
         </div>
       </div>
+    </PlCard>
+
+    <!-- Footer navigation -->
+    <div class="attention-analysis__footer">
+      <PlButton variant="secondary" @click="goPrev">
+        <PlIcon name="arrow-left" size="sm" />
+        上一步：模型训练
+      </PlButton>
+      <PlButton variant="dark" :disabled="!heatmap" @click="goNext">
+        下一步：表达式推导
+        <PlIcon name="arrow-right" size="sm" />
+      </PlButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, nextTick } from "vue";
+import { useRouter } from "vue-router";
 import VChart from "vue-echarts";
 import { use } from "echarts/core";
 import { HeatmapChart } from "echarts/charts";
@@ -68,8 +108,22 @@ import * as d3 from "d3";
 import type { NetworkGraphResponse, NetworkNode } from "@/types/analysis";
 import { useAnalysis } from "@/composables/useAnalysis";
 import { useTraining } from "@/composables/useTraining";
+import { CHART_COLORS } from "@/utils/chart-palette";
+
+import PlButton from "@/components/PlButton.vue";
+import PlSelect from "@/components/PlSelect.vue";
+import PlInput from "@/components/PlInput.vue";
+import PlCard from "@/components/PlCard.vue";
+import PlSpinner from "@/components/PlSpinner.vue";
+import PlToast from "@/components/PlToast.vue";
+import PlEmptyState from "@/components/PlEmptyState.vue";
+import PlPageHeader from "@/components/PlPageHeader.vue";
+import PlIcon from "@/components/PlIcon.vue";
+import PlProgressBar from "@/components/PlProgressBar.vue";
 
 use([HeatmapChart, GridComponent, TooltipComponent, VisualMapComponent, CanvasRenderer]);
+
+const router = useRouter();
 
 interface SimNode extends NetworkNode {
   x: number;
@@ -85,12 +139,48 @@ const { heatmap, network, loading, error, fetchHeatmap, fetchNetwork } =
 const { checkpoints, fetchCheckpoints } = useTraining();
 
 const selectedCheckpoint = ref("");
-const threshold = ref(0.05);
+const threshold = ref(50);
 const networkRef = ref<HTMLElement | null>(null);
 let simulation: d3.Simulation<SimNode, d3.SimulationLinkDatum<SimNode>> | null =
   null;
 
 fetchCheckpoints();
+
+const checkpointOptions = computed(() =>
+  checkpoints.value.map((cp) => ({
+    value: cp.id,
+    label: `${cp.id} (loss: ${cp.final_loss.toFixed(4)})`,
+  })),
+);
+
+// Top-5 attention weights extracted from heatmap matrix
+interface AttentionEntry {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+const topAttentionWeights = computed<AttentionEntry[]>(() => {
+  if (!heatmap.value) return [];
+  const names = heatmap.value.feature_names;
+  const values = heatmap.value.values;
+  const entries: AttentionEntry[] = [];
+  for (let i = 0; i < names.length; i++) {
+    for (let j = 0; j < names.length; j++) {
+      if (i !== j) {
+        entries.push({ source: names[i], target: names[j], weight: values[i][j] });
+      }
+    }
+  }
+  return entries
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 5);
+});
+
+const maxAttentionValue = computed(() => {
+  if (!heatmap.value) return 1;
+  return heatmap.value.max_value;
+});
 
 const heatmapOption = computed(() => {
   if (!heatmap.value) return {};
@@ -131,7 +221,7 @@ const heatmapOption = computed(() => {
       left: "center",
       bottom: "0%",
       inRange: {
-        color: ["#313695", "#4575b4", "#74add1", "#abd9e9", "#fee090", "#fdae61", "#f46d43", "#d73027"],
+        color: ["#1aae39", "#8bc34a", "#f5d75e", "#ff9800", "#e03131"],
       },
     },
     series: [
@@ -194,7 +284,7 @@ function renderNetworkGraph(
     .data(links)
     .join("line")
     .attr("stroke", (d) =>
-      d.classification === "synergistic" ? "#4caf50" : "#f44336",
+      d.classification === "synergistic" ? CHART_COLORS.success : CHART_COLORS.error,
     )
     .attr("stroke-width", (d) => Math.max(1, d.weight * 10))
     .attr("stroke-opacity", 0.6);
@@ -226,14 +316,14 @@ function renderNetworkGraph(
   node
     .append("circle")
     .attr("r", 10)
-    .attr("fill", "#2196f3")
-    .attr("stroke", "#fff")
+    .attr("fill", getComputedStyle(document.documentElement).getPropertyValue("--color-primary").trim() || CHART_COLORS.primary)
+    .attr("stroke", getComputedStyle(document.documentElement).getPropertyValue("--color-hairline").trim() || "#e5e3df")
     .attr("stroke-width", 2);
 
   node
     .append("text")
     .text((d) => d.name)
-    .attr("font-size", 10)
+    .attr("font-size", getComputedStyle(document.documentElement).getPropertyValue("--text-sm").trim() || "0.9286rem")
     .attr("dx", 14)
     .attr("dy", 4);
 
@@ -245,6 +335,11 @@ function renderNetworkGraph(
       .attr("y2", (d) => (d.target as SimNode).y!);
     node.attr("transform", (d) => `translate(${d.x},${d.y})`);
   });
+}
+
+function handleThresholdChange(val: string) {
+  threshold.value = Number(val);
+  updateNetwork();
 }
 
 async function analyze() {
@@ -277,118 +372,126 @@ watch(network, (data) => {
 onUnmounted(() => {
   simulation?.stop();
 });
+
+function goPrev() {
+  router.push({ name: "training" });
+}
+
+function goNext() {
+  router.push({ name: "expression" });
+}
 </script>
 
 <style scoped>
 .attention-analysis {
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: 20px;
-  font-family: system-ui, sans-serif;
-}
-
-h2 {
-  color: #2e7d32;
-  text-align: center;
-}
-
-.toolbar {
+  padding: var(--space-10);
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  justify-content: center;
+  flex-direction: column;
+  gap: var(--space-6);
+  font-family: var(--font-family);
 }
 
-.checkpoint-select {
-  padding: 6px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  min-width: 250px;
-}
-
-.btn-analyze {
-  padding: 6px 20px;
-  background: #4caf50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-analyze:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.threshold-control {
+/* ── Toolbar ── */
+.attention-analysis__toolbar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
-.panels {
+/* ── Visualization grid (1:1 split) ── */
+.attention-analysis__viz-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: var(--space-6);
 }
 
-.panel {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 16px;
+@media (max-width: 1024px) {
+  .attention-analysis__viz-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-.panel h3 {
-  margin: 0 0 12px 0;
-  color: #333;
-  font-size: 16px;
+/* ── Card title ── */
+.card-title {
+  font-size: var(--text-h3);
+  font-weight: var(--text-h3-weight);
+  color: var(--color-charcoal);
+  margin: 0 0 var(--space-4);
 }
 
+/* ── Heatmap chart ── */
+.heatmap-chart {
+  height: 500px;
+  width: 100%;
+}
+
+/* ── Network graph ── */
 .network-container {
   width: 100%;
   height: 500px;
 }
 
-.legend {
+.network-legend {
   display: flex;
-  gap: 16px;
-  margin-top: 8px;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
   justify-content: center;
 }
 
-.legend-item {
+.network-legend__item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 13px;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-slate);
 }
 
-.legend-item.synergistic::before {
+.network-legend__item--synergistic::before {
   content: "";
   display: inline-block;
   width: 12px;
   height: 3px;
-  background: #4caf50;
+  background: var(--color-success);
+  border-radius: var(--radius-full);
 }
 
-.legend-item.antagonistic::before {
+.network-legend__item--antagonistic::before {
   content: "";
   display: inline-block;
   width: 12px;
   height: 3px;
-  background: #f44336;
+  background: var(--color-error);
+  border-radius: var(--radius-full);
 }
 
-.loading,
-.error {
-  text-align: center;
-  padding: 40px;
-  color: #666;
+/* ── Summary bar: Top-5 attention weights ── */
+.attention-analysis__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
-.error {
-  color: #f44336;
+.attention-analysis__summary-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.attention-analysis__summary-label {
+  font-size: var(--text-sm);
+  color: var(--color-charcoal);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Footer navigation ── */
+.attention-analysis__footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--space-4);
 }
 </style>

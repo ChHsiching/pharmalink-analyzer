@@ -15,7 +15,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Tauri 2](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=black)](https://tauri.app)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2+-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 </div>
 
@@ -224,4 +224,11 @@ All services receive dependencies through constructor injection (`CheckpointReso
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+AGPL-3.0-only · Copyright (c) 2026 ChHsiching — see [LICENSE](LICENSE).
+
+- Use (including internal commercial use), modification, and distribution are free. Distributing it or offering it as a network service requires derivative works to be open-sourced under AGPL-3.0.
+- Closed-source commercial use requires a separate commercial license: hsichingchang@gmail.com
+
+### Contribution Terms
+
+By submitting a PR, you agree to license your contribution under AGPL-3.0 and grant the maintainer the right to offer separate commercial licenses. Your contribution remains available to everyone under AGPL.
